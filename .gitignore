@@ -15,5 +15,6 @@
 # vendor/
 
 input.txt
+minidb-go
 
 .vscode
