@@ -12,8 +12,22 @@ type Lexer struct {
 	tokenSequence []Token
 }
 
+type savePoint struct {
+	tokenPos int
+}
+
+func (lexer *Lexer) mark() savePoint {
+	return savePoint{
+		tokenPos: lexer.tokenPos,
+	}
+}
+
+func (lexer *Lexer) reset(savePoint savePoint) {
+	lexer.tokenPos = savePoint.tokenPos
+}
+
 func NewLexer(_sql string) (lexer Lexer, err error) {
-	lexer = Lexer{sql: _sql, tokenPos: 0, tokenSequence: make([]Token, 0)}
+	lexer = Lexer{sql: _sql, tokenPos: 0, tokenSequence: make([]Token, 5)}
 	pos := 0
 	for {
 		token, chNum, err := scanToken(&lexer.sql, pos)
