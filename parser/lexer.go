@@ -27,7 +27,7 @@ func (lexer *Lexer) reset(savePoint savePoint) {
 }
 
 func NewLexer(_sql string) (lexer Lexer, err error) {
-	lexer = Lexer{sql: _sql, tokenPos: 0, tokenSequence: make([]Token, 5)}
+	lexer = Lexer{sql: _sql, tokenPos: 0, tokenSequence: make([]Token, 0)}
 	pos := 0
 	for {
 		token, chNum, err := scanToken(&lexer.sql, pos)
@@ -102,6 +102,7 @@ func scanSymbolToken(sql *string, pos int) (Token, error) {
 
 var keywordTokenType = map[string]TokenType{
 	"create":   TT_CREATE,
+	"table":    TT_TABLE,
 	"insert":   TT_INSERT,
 	"into":     TT_INTO,
 	"values":   TT_VALUES,

@@ -30,6 +30,8 @@ func (m *MyFormatter) Format(entry *log.Entry) ([]byte, error) {
 		levelColor = color.FgBlue
 	}
 
+	blue := color.New(color.FgBlue).SprintFunc()
+
 	toColor := color.New(levelColor).SprintFunc()
 	timestamp := entry.Time.Format("2006-01-02 15:04:05.000")
 	var file string
@@ -38,9 +40,10 @@ func (m *MyFormatter) Format(entry *log.Entry) ([]byte, error) {
 		file = filepath.Base(entry.Caller.File)
 		line = entry.Caller.Line
 	}
-	levelText := strings.ToLower(entry.Level.String())
+	levelText := strings.ToUpper(entry.Level.String())
 
-	msg := fmt.Sprintf("[%s] [%s:%d] [GOID:%d] [%s] %s\n", timestamp, file, line, getGID(), toColor(levelText), entry.Message)
+	fileLine := blue(file, ":", line)
+	msg := fmt.Sprintf("%v [%s] [%s] [GOID:%d] %s\n", toColor(levelText+":"), timestamp, fileLine, getGID(), entry.Message)
 	return []byte(msg), nil
 }
 

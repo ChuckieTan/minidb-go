@@ -8,12 +8,12 @@ const (
 	CT_TEXT
 )
 
-type ColumnDeine struct {
+type ColumnDefine struct {
 	Type ColumnType
 	Name string
 }
 
-func (columnDeine *ColumnDeine) SetColumnType(str string) {
+func (columnDeine *ColumnDefine) SetColumnType(str string) {
 	var columnType ColumnType = CT_INT
 	switch str {
 	case "int":
@@ -28,5 +28,5 @@ func (columnDeine *ColumnDeine) SetColumnType(str string) {
 
 type CreateTableStatement struct {
 	TableName       string
-	ColumnDeineList []ColumnDeine
+	ColumnDeineList []ColumnDefine
 }
