@@ -23,9 +23,10 @@ func main() {
 	// util.StartUp()
 	// sql := util.ReadInput()
 	// fmt.Println(sql)
-	sql := "create table student (id int, name text);"
+	// sql := "create table student (id int, name text);"
+	sql := "insert into student values (1, 'tom');"
 	sqlParser, _ := parser.NewParser(&sql)
-	fmt.Println(sqlParser.ParseCreateTableStatement())
+	fmt.Println(sqlParser.ParseInsertIntoStatement())
 	lexer, err := parser.NewLexer(sql)
 	if err == nil {
 		token := lexer.GetNextToken()

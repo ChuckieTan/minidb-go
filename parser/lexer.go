@@ -177,6 +177,22 @@ func scanNumberToken(sql *string, pos int) (token Token, err error) {
 	return token, err
 }
 
+func scanStringToken(sql *string, pos int) (
+	token Token,
+	err error,
+) {
+	if (*sql)[pos] != '\'' {
+		err = fmt.Errorf("not a string")
+		return
+	}
+	tokenLen := 1
+	for (*sql)[pos+tokenLen] != '\'' {
+		tokenLen++
+	}
+	token = Token{Type: TT_STRING, Val: (*sql)[pos+1 : pos+tokenLen]}
+	return token, nil
+}
+
 func scanToken(sql *string, pos int) (token Token, chNum int, err error) {
 	if pos >= len(*sql) {
 		return Token{Type: TT_END, Val: ""}, chNum, nil
@@ -192,6 +208,9 @@ func scanToken(sql *string, pos int) (token Token, chNum int, err error) {
 		token, err = scanNumberToken(sql, pos)
 	case unicode.IsLetter(ch):
 		token, err = scanLiteralToken(sql, pos)
+	case ch == '\'':
+		token, err = scanStringToken(sql, pos)
+		chNum += 2
 	default:
 		token, err = scanSymbolToken(sql, pos)
 	}
