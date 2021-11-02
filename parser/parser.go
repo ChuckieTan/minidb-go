@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"minidb-go/ast"
+	"minidb-go/parser/token"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -24,7 +25,7 @@ func NewParser(sql *string) (parser Parser, err error) {
 func (parser *Parser) ParseCreateTableStatement() (
 	statement ast.CreateTableStatement, err error,
 ) {
-	if !parser.chain(TT_CREATE, TT_TABLE) {
+	if !parser.chain(token.TT_CREATE, token.TT_TABLE) {
 		err = fmt.Errorf("not a create table statement")
 		log.Error(err.Error())
 		return statement, err
@@ -33,7 +34,7 @@ func (parser *Parser) ParseCreateTableStatement() (
 	if err != nil {
 		return statement, err
 	}
-	if !parser.match(TT_LBRACKET) {
+	if !parser.match(token.TT_LBRACKET) {
 		err = fmt.Errorf("expected a '('")
 		log.Error(err.Error())
 		return statement, err
@@ -41,7 +42,7 @@ func (parser *Parser) ParseCreateTableStatement() (
 	for {
 		define, err := parser.parseColumnDefine()
 		statement.ColumnDeineList = append(statement.ColumnDeineList, define)
-		if !parser.match(TT_COMMA) || err != nil {
+		if !parser.match(token.TT_COMMA) || err != nil {
 			break
 		}
 	}
@@ -49,7 +50,7 @@ func (parser *Parser) ParseCreateTableStatement() (
 		log.Error(err.Error())
 		return
 	}
-	if !parser.chain(TT_RBRACKET, TT_SEMICOLON) {
+	if !parser.chain(token.TT_RBRACKET, token.TT_SEMICOLON) {
 		err = fmt.Errorf("expected ')' or ';'")
 		log.Error(err.Error())
 	}
@@ -58,30 +59,30 @@ func (parser *Parser) ParseCreateTableStatement() (
 
 func (parser *Parser) parseColumnDefine() (
 	define ast.ColumnDefine, err error) {
-	if parser.lexer.GetCurrentToken().Type != TT_IDENTIFIER {
+	if parser.lexer.GetCurrentToken().Type != token.TT_IDENTIFIER {
 		err = fmt.Errorf("expected a column name")
 		log.Error(err.Error())
 		return define, err
 	}
 	define.Name = parser.lexer.GetNextToken().Val
 
-	token := parser.lexer.GetNextToken()
-	if token.Type != TT_IDENTIFIER {
+	t := parser.lexer.GetNextToken()
+	if t.Type != token.TT_IDENTIFIER {
 		err = fmt.Errorf("expected a column name")
 		log.Error(err.Error())
 		return define, err
 	}
-	if token.Val != "int" && token.Val != "float" && token.Val != "text" {
-		err = fmt.Errorf("invalid column datatype: %v", token.Val)
+	if t.Val != "int" && t.Val != "float" && t.Val != "text" {
+		err = fmt.Errorf("invalid column datatype: %v", t.Val)
 		log.Error(err.Error())
 		return define, err
 	}
-	define.SetColumnType(token.Val)
+	define.SetColumnType(t.Val)
 	return define, nil
 }
 
 func (parser *Parser) parseTableName() (tableName string, err error) {
-	if parser.lexer.GetCurrentToken().Type != TT_IDENTIFIER {
+	if parser.lexer.GetCurrentToken().Type != token.TT_IDENTIFIER {
 		err = fmt.Errorf("expected a table name")
 		log.Error(err.Error())
 		return "", err
@@ -93,19 +94,19 @@ func (parser *Parser) ParseInsertIntoStatement() (
 	statement ast.InsertIntoStatement,
 	err error,
 ) {
-	if !parser.chain(TT_INSERT, TT_INTO) {
+	if !parser.chain(token.TT_INSERT, token.TT_INTO) {
 		err = fmt.Errorf("not a create table statement")
 		log.Error(err.Error())
 		return
 	}
-	if token := parser.lexer.GetNextToken(); token.Type == TT_IDENTIFIER {
-		statement.TableSource = token.Val
+	if t := parser.lexer.GetNextToken(); t.Type == token.TT_IDENTIFIER {
+		statement.TableSource = t.Val
 	} else {
-		err = fmt.Errorf("expect a table name, given %v", token.Val)
+		err = fmt.Errorf("expect a table name, given %v", t.Val)
 		log.Error(err.Error())
 		return
 	}
-	if !parser.chain(TT_VALUES, TT_LBRACKET) {
+	if !parser.chain(token.TT_VALUES, token.TT_LBRACKET) {
 		err = fmt.Errorf("expected 'values', '('")
 		log.Error(err.Error())
 		return
@@ -116,11 +117,11 @@ func (parser *Parser) ParseInsertIntoStatement() (
 			return statement, err
 		}
 		statement.ValueList = append(statement.ValueList, value)
-		if !parser.match(TT_COMMA) {
+		if !parser.match(token.TT_COMMA) {
 			break
 		}
 	}
-	if !parser.chain(TT_RBRACKET, TT_SEMICOLON) {
+	if !parser.chain(token.TT_RBRACKET, token.TT_SEMICOLON) {
 		err = fmt.Errorf("expected a '(' and ';'")
 		log.Error(err.Error())
 		return
@@ -128,55 +129,178 @@ func (parser *Parser) ParseInsertIntoStatement() (
 	return statement, nil
 }
 
-func (parser *Parser) parseLiteralValue() (
-	value ast.SQLExprValue, err error,
+func (parser *Parser) ParseSelectStatement() (
+	statement ast.SelectStatement,
+	err error,
 ) {
-	token := parser.lexer.GetNextToken()
-	switch token.Type {
-	case TT_STRING:
-		value = ast.SQLText(token.Val)
-	case TT_PLUS:
-		token = parser.lexer.GetNextToken()
-		value, err = parser.parseNumericValue(1, token)
-	case TT_MINUS:
-		token = parser.lexer.GetNextToken()
-		value, err = parser.parseNumericValue(-1, token)
-	default:
-		value, err = parser.parseNumericValue(1, token)
+	if !parser.match(token.TT_SELECT) {
+		err = fmt.Errorf("not a select statement")
+		log.Error(err.Error())
+		return
 	}
-	return value, err
+	if parser.match(token.TT_STAR) {
+		statement.ResultList = append(statement.ResultList, "*")
+	} else {
+		for {
+			name, err := parser.parseColumnName()
+			if err != nil {
+				return statement, err
+			}
+			statement.ResultList = append(statement.ResultList, name)
+
+			if !parser.match(token.TT_COMMA) {
+				break
+			}
+		}
+	}
+	if t := parser.lexer.GetCurrentToken(); !parser.match(token.TT_FROM) {
+		log.Error("expected 'from', found '%v'", t.Val)
+	}
+
+	if t := parser.lexer.GetCurrentToken(); parser.match(token.TT_IDENTIFIER) {
+		statement.TableSource = t.Val
+	} else {
+		err = fmt.Errorf("expected 'Identifier', found '%v'", t.Val)
+		log.Error(err.Error())
+		return
+	}
+
+	if t := parser.lexer.GetCurrentToken(); t.Type == token.TT_WHERE {
+		where, err := parser.parseWhere()
+		if err != nil {
+			return statement, err
+		}
+		statement.Where = where
+	} else {
+		statement.Where.IsExists = false
+	}
+
+	if !parser.chain(token.TT_SEMICOLON) {
+		err = fmt.Errorf("expected ';'")
+		log.Error(err.Error())
+		return
+	}
+	return statement, nil
+
 }
 
-func (parser *Parser) parseNumericValue(sign int, token Token) (
-	value ast.SQLExprValue, err error,
+func (parser *Parser) parseWhere() (
+	statement ast.WhereStatement, err error,
 ) {
-	switch token.Type {
-	case TT_INTEGER:
-		var v int64
-		v, err = strconv.ParseInt(token.Val, 10, 64)
-		if err != nil {
-			err = fmt.Errorf("%v is not a int value", token.Val)
-			log.Error(err.Error())
-			return
-		}
-		return ast.SQLInt(int64(sign) * v), nil
-	case TT_FLOAT:
-		var v float64
-		v, err = strconv.ParseFloat(token.Val, 64)
-		if err != nil {
-			err = fmt.Errorf("%v is not a int value", token.Val)
-			log.Error(err.Error())
-			return
-		}
-		return ast.SQLInt(float64(sign) * v), nil
-	default:
-		err = fmt.Errorf("expected a value, given '%v'", token.Val)
+	if t := parser.lexer.GetNextToken(); t.Type == token.TT_WHERE {
+		statement.Expr, err = parser.parseExpr()
+		statement.IsExists = true
+		return
+	} else {
+		err = fmt.Errorf("expected 'where', found '%v'", t.Val)
 		log.Error(err.Error())
 		return
 	}
 }
 
-func (parser *Parser) match(tokenType TokenType) bool {
+func (parser *Parser) parseExpr() (
+	expr ast.SQLExpr, err error) {
+	expr.LValue, err = parser.parseExprValue()
+	if err != nil {
+		return
+	}
+	expr.Op, err = parser.parseComparisonOperator()
+	if err != nil {
+		return
+	}
+	expr.RValue, err = parser.parseExprValue()
+	if err != nil {
+		return
+	}
+	return expr, nil
+}
+
+func (parse *Parser) parseExprValue() (
+	exprValue ast.SQLExprValue, err error) {
+	resToken := parse.lexer.GetCurrentToken()
+	if resToken.Type == token.TT_IDENTIFIER {
+		parse.lexer.GetNextToken()
+		exprValue = ast.SQLColumn(resToken.Val)
+		return
+	} else {
+		exprValue, err = parse.parseLiteralValue()
+		return
+	}
+}
+
+func (parse *Parser) parseComparisonOperator() (
+	resType token.TokenType, err error) {
+	if resToken := parse.lexer.GetCurrentToken(); parse.tree(
+		token.TT_LESS, token.TT_LESS_OR_EQUAL, token.TT_ASSIGN,
+		token.TT_EQUAL, token.TT_NOT_EQUAL, token.TT_GREATER,
+		token.TT_GREATER_OR_EQUAL) {
+		return resToken.Type, nil
+	} else {
+		err = fmt.Errorf("expected 'comparison operator, found '%v'", resToken.Val)
+		log.Error(err.Error())
+		return
+	}
+}
+
+func (parser *Parser) parseColumnName() (name string, err error) {
+	if t := parser.lexer.GetCurrentToken(); parser.match(token.TT_IDENTIFIER) {
+		return t.Val, nil
+	} else {
+		err = fmt.Errorf("expected a column name, found '%v'", t.Val)
+		log.Error(err.Error())
+		return name, err
+	}
+}
+
+func (parser *Parser) parseLiteralValue() (
+	value ast.SQLExprValue, err error,
+) {
+	t := parser.lexer.GetNextToken()
+	switch t.Type {
+	case token.TT_STRING:
+		value = ast.SQLText(t.Val)
+	case token.TT_PLUS:
+		t = parser.lexer.GetNextToken()
+		value, err = parser.parseNumericValue(1, t)
+	case token.TT_MINUS:
+		t = parser.lexer.GetNextToken()
+		value, err = parser.parseNumericValue(-1, t)
+	default:
+		value, err = parser.parseNumericValue(1, t)
+	}
+	return value, err
+}
+
+func (parser *Parser) parseNumericValue(sign int, numToken token.Token) (
+	value ast.SQLExprValue, err error,
+) {
+	switch numToken.Type {
+	case token.TT_INTEGER:
+		var v int64
+		v, err = strconv.ParseInt(numToken.Val, 10, 64)
+		if err != nil {
+			err = fmt.Errorf("%v is not a int value", numToken.Val)
+			log.Error(err.Error())
+			return
+		}
+		return ast.SQLInt(int64(sign) * v), nil
+	case token.TT_FLOAT:
+		var v float64
+		v, err = strconv.ParseFloat(numToken.Val, 64)
+		if err != nil {
+			err = fmt.Errorf("%v is not a int value", numToken.Val)
+			log.Error(err.Error())
+			return
+		}
+		return ast.SQLInt(float64(sign) * v), nil
+	default:
+		err = fmt.Errorf("expected a value, given '%v'", numToken.Val)
+		log.Error(err.Error())
+		return
+	}
+}
+
+func (parser *Parser) match(tokenType token.TokenType) bool {
 	savePoint := parser.lexer.mark()
 	if parser.lexer.GetNextToken().Type == tokenType {
 		return true
@@ -186,13 +310,22 @@ func (parser *Parser) match(tokenType TokenType) bool {
 	}
 }
 
-func (parser *Parser) chain(tokenTypeList ...TokenType) bool {
+func (parser *Parser) chain(tokenTypeList ...token.TokenType) bool {
 	savePoint := parser.lexer.mark()
 	for _, tokenType := range tokenTypeList {
-		if !parser.match(TokenType(tokenType)) {
+		if !parser.match(token.TokenType(tokenType)) {
 			parser.lexer.reset(savePoint)
 			return false
 		}
 	}
 	return true
+}
+
+func (parser *Parser) tree(tokenTypeList ...token.TokenType) bool {
+	for _, tokenType := range tokenTypeList {
+		if parser.match(tokenType) {
+			return true
+		}
+	}
+	return false
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"minidb-go/parser"
+	"minidb-go/parser/token"
 	"minidb-go/util"
 	"os"
 
@@ -24,16 +25,16 @@ func main() {
 	// sql := util.ReadInput()
 	// fmt.Println(sql)
 	// sql := "create table student (id int, name text);"
-	sql := "insert into student values (1, 'tom');"
+	sql := "select * from student where id = 1;"
 	sqlParser, _ := parser.NewParser(&sql)
-	fmt.Println(sqlParser.ParseInsertIntoStatement())
+	fmt.Println(sqlParser.ParseSelectStatement())
 	lexer, err := parser.NewLexer(sql)
 	if err == nil {
-		token := lexer.GetNextToken()
-		fmt.Println(token.Val)
-		for token.Type != parser.TT_END {
-			token = lexer.GetNextToken()
-			fmt.Println(token.Val)
+		t := lexer.GetNextToken()
+		fmt.Println(t.Val)
+		for t.Type != token.TT_END {
+			t = lexer.GetNextToken()
+			fmt.Println(t.Val)
 		}
 	}
 }

@@ -1,6 +1,6 @@
 package ast
 
 type WhereStatement struct {
-	isExists bool
-	expr     SQLExpr
+	IsExists bool
+	Expr     SQLExpr
 }

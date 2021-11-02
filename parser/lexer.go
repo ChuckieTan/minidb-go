@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"minidb-go/parser/token"
 	"strings"
 	"unicode"
 )
@@ -9,7 +10,7 @@ import (
 type Lexer struct {
 	sql           string
 	tokenPos      int
-	tokenSequence []Token
+	tokenSequence []token.Token
 }
 
 type savePoint struct {
@@ -27,16 +28,16 @@ func (lexer *Lexer) reset(savePoint savePoint) {
 }
 
 func NewLexer(_sql string) (lexer Lexer, err error) {
-	lexer = Lexer{sql: _sql, tokenPos: 0, tokenSequence: make([]Token, 0)}
+	lexer = Lexer{sql: _sql, tokenPos: 0, tokenSequence: make([]token.Token, 0)}
 	pos := 0
 	for {
-		token, chNum, err := scanToken(&lexer.sql, pos)
-		if token.Type == TT_END || token.Type == TT_ILLEGAL {
+		resToken, chNum, err := scanToken(&lexer.sql, pos)
+		if resToken.Type == token.TT_END || resToken.Type == token.TT_ILLEGAL {
 			break
 		}
 		if err == nil {
 			pos += chNum
-			lexer.tokenSequence = append(lexer.tokenSequence, token)
+			lexer.tokenSequence = append(lexer.tokenSequence, resToken)
 		} else {
 			return lexer, fmt.Errorf("invalid sql statement")
 		}
@@ -44,91 +45,91 @@ func NewLexer(_sql string) (lexer Lexer, err error) {
 	return lexer, nil
 }
 
-func (lexer *Lexer) GetNextToken() (token Token) {
+func (lexer *Lexer) GetNextToken() (resToken token.Token) {
 	if lexer.tokenPos < len(lexer.tokenSequence) {
-		token = lexer.tokenSequence[lexer.tokenPos]
+		resToken = lexer.tokenSequence[lexer.tokenPos]
 		lexer.tokenPos++
 	} else {
-		token = Token{Type: TT_END, Val: ""}
+		resToken = token.Token{Type: token.TT_END, Val: ""}
 	}
-	return token
+	return resToken
 }
 
-func (lexer *Lexer) GetCurrentToken() (token Token) {
+func (lexer *Lexer) GetCurrentToken() (resToken token.Token) {
 	if lexer.tokenPos < len(lexer.tokenSequence) {
-		token = lexer.tokenSequence[lexer.tokenPos]
+		resToken = lexer.tokenSequence[lexer.tokenPos]
 	} else {
-		token = Token{Type: TT_END, Val: ""}
+		resToken = token.Token{Type: token.TT_END, Val: ""}
 	}
-	return token
+	return resToken
 }
 
-var symbolTokenType = map[string]TokenType{
-	",":  TT_COMMA,
-	"*":  TT_STAR,
-	"(":  TT_LBRACKET,
-	")":  TT_RBRACKET,
-	"+":  TT_PLUS,
-	"-":  TT_MINUS,
-	";":  TT_SEMICOLON,
-	"==": TT_EQUAL,
-	"!=": TT_NOT_EQUAL,
-	"<=": TT_LESS_OR_EQUAL,
-	"<>": TT_NOT_EQUAL,
-	">=": TT_GREATER_OR_EQUAL,
-	"=":  TT_ASSIGN,
-	".":  TT_DOT,
-	"/":  TT_DIV,
-	"%":  TT_MOD,
+var symbolTokenType = map[string]token.TokenType{
+	",":  token.TT_COMMA,
+	"*":  token.TT_STAR,
+	"(":  token.TT_LBRACKET,
+	")":  token.TT_RBRACKET,
+	"+":  token.TT_PLUS,
+	"-":  token.TT_MINUS,
+	";":  token.TT_SEMICOLON,
+	"==": token.TT_EQUAL,
+	"!=": token.TT_NOT_EQUAL,
+	"<=": token.TT_LESS_OR_EQUAL,
+	"<>": token.TT_NOT_EQUAL,
+	">=": token.TT_GREATER_OR_EQUAL,
+	"=":  token.TT_ASSIGN,
+	".":  token.TT_DOT,
+	"/":  token.TT_DIV,
+	"%":  token.TT_MOD,
 }
 
-func scanSymbolToken(sql *string, pos int) (Token, error) {
+func scanSymbolToken(sql *string, pos int) (token.Token, error) {
 	if pos < len(*sql)-1 {
 		ch := (*sql)[pos : pos+2]
 		if tokenType, ok := symbolTokenType[ch]; ok {
-			return Token{Type: tokenType, Val: ch}, nil
+			return token.Token{Type: tokenType, Val: ch}, nil
 		}
 	}
 
 	ch := (*sql)[pos : pos+1]
 	if tokenType, ok := symbolTokenType[ch]; ok {
-		return Token{Type: tokenType, Val: ch}, nil
+		return token.Token{Type: tokenType, Val: ch}, nil
 	}
 
-	token := Token{Type: TT_ILLEGAL, Val: ""}
+	token := token.Token{Type: token.TT_ILLEGAL, Val: ""}
 	err := fmt.Errorf("cannot scan symbol token which is %v", ch)
 	return token, err
 }
 
-var keywordTokenType = map[string]TokenType{
-	"create":   TT_CREATE,
-	"table":    TT_TABLE,
-	"insert":   TT_INSERT,
-	"into":     TT_INTO,
-	"values":   TT_VALUES,
-	"delete":   TT_DELETE,
-	"update":   TT_UPDATE,
-	"set":      TT_SET,
-	"drop":     TT_DROP,
-	"select":   TT_SELECT,
-	"from":     TT_FROM,
-	"where":    TT_WHERE,
-	"and":      TT_AND,
-	"or":       TT_OR,
-	"not":      TT_NOT,
-	"in":       TT_IN,
-	"is":       TT_IS,
-	"null":     TT_NULL_,
-	"if":       TT_IF,
-	"exists":   TT_EXISTS,
-	"true":     TT_TRUE,
-	"false":    TT_FALSE,
-	"between":  TT_BETWEEN,
-	"distinct": TT_DISTINCT,
-	"all":      TT_ALL,
+var keywordTokenType = map[string]token.TokenType{
+	"create":   token.TT_CREATE,
+	"table":    token.TT_TABLE,
+	"insert":   token.TT_INSERT,
+	"into":     token.TT_INTO,
+	"values":   token.TT_VALUES,
+	"delete":   token.TT_DELETE,
+	"update":   token.TT_UPDATE,
+	"set":      token.TT_SET,
+	"drop":     token.TT_DROP,
+	"select":   token.TT_SELECT,
+	"from":     token.TT_FROM,
+	"where":    token.TT_WHERE,
+	"and":      token.TT_AND,
+	"or":       token.TT_OR,
+	"not":      token.TT_NOT,
+	"in":       token.TT_IN,
+	"is":       token.TT_IS,
+	"null":     token.TT_NULL_,
+	"if":       token.TT_IF,
+	"exists":   token.TT_EXISTS,
+	"true":     token.TT_TRUE,
+	"false":    token.TT_FALSE,
+	"between":  token.TT_BETWEEN,
+	"distinct": token.TT_DISTINCT,
+	"all":      token.TT_ALL,
 }
 
-func scanLiteralToken(sql *string, pos int) (token Token, err error) {
+func scanLiteralToken(sql *string, pos int) (resToken token.Token, err error) {
 	tokenLen := 1
 	ch := rune((*sql)[pos+tokenLen])
 	for pos+tokenLen < len(*sql) &&
@@ -140,15 +141,15 @@ func scanLiteralToken(sql *string, pos int) (token Token, err error) {
 	word = strings.ToLower(word)
 
 	if tokenType, ok := keywordTokenType[word]; ok {
-		token = Token{Type: tokenType, Val: word}
+		resToken = token.Token{Type: tokenType, Val: word}
 	} else {
-		token = Token{Type: TT_IDENTIFIER, Val: word}
+		resToken = token.Token{Type: token.TT_IDENTIFIER, Val: word}
 	}
 
-	return token, nil
+	return resToken, nil
 }
 
-func scanNumberToken(sql *string, pos int) (token Token, err error) {
+func scanNumberToken(sql *string, pos int) (resToken token.Token, err error) {
 	tokenLen, numOfDot := 0, 0
 
 	ch := rune((*sql)[pos+tokenLen])
@@ -164,21 +165,21 @@ func scanNumberToken(sql *string, pos int) (token Token, err error) {
 
 	switch numOfDot {
 	case 0:
-		token = Token{Type: TT_INTEGER, Val: word}
+		resToken = token.Token{Type: token.TT_INTEGER, Val: word}
 		err = nil
 	case 1:
-		token = Token{Type: TT_FLOAT, Val: word}
+		resToken = token.Token{Type: token.TT_FLOAT, Val: word}
 		err = nil
 	default:
-		token = Token{Type: TT_ILLEGAL, Val: word}
+		resToken = token.Token{Type: token.TT_ILLEGAL, Val: word}
 		err = fmt.Errorf("%v is not a number", word)
 	}
 
-	return token, err
+	return resToken, err
 }
 
 func scanStringToken(sql *string, pos int) (
-	token Token,
+	resToken token.Token,
 	err error,
 ) {
 	if (*sql)[pos] != '\'' {
@@ -189,13 +190,13 @@ func scanStringToken(sql *string, pos int) (
 	for (*sql)[pos+tokenLen] != '\'' {
 		tokenLen++
 	}
-	token = Token{Type: TT_STRING, Val: (*sql)[pos+1 : pos+tokenLen]}
-	return token, nil
+	resToken = token.Token{Type: token.TT_STRING, Val: (*sql)[pos+1 : pos+tokenLen]}
+	return resToken, nil
 }
 
-func scanToken(sql *string, pos int) (token Token, chNum int, err error) {
+func scanToken(sql *string, pos int) (resToken token.Token, chNum int, err error) {
 	if pos >= len(*sql) {
-		return Token{Type: TT_END, Val: ""}, chNum, nil
+		return token.Token{Type: token.TT_END, Val: ""}, chNum, nil
 	}
 	// 忽略空白字符
 	for unicode.IsSpace(rune((*sql)[pos])) {
@@ -205,15 +206,15 @@ func scanToken(sql *string, pos int) (token Token, chNum int, err error) {
 	ch := rune((*sql)[pos])
 	switch {
 	case unicode.IsDigit(ch):
-		token, err = scanNumberToken(sql, pos)
+		resToken, err = scanNumberToken(sql, pos)
 	case unicode.IsLetter(ch):
-		token, err = scanLiteralToken(sql, pos)
+		resToken, err = scanLiteralToken(sql, pos)
 	case ch == '\'':
-		token, err = scanStringToken(sql, pos)
+		resToken, err = scanStringToken(sql, pos)
 		chNum += 2
 	default:
-		token, err = scanSymbolToken(sql, pos)
+		resToken, err = scanSymbolToken(sql, pos)
 	}
-	chNum += len(token.Val)
-	return token, chNum, err
+	chNum += len(resToken.Val)
+	return resToken, chNum, err
 }

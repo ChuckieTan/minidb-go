@@ -1,5 +1,9 @@
 package ast
 
+import (
+	"minidb-go/parser/token"
+)
+
 type SQLInt int64
 type SQLFloat float64
 type SQLText string
@@ -24,6 +28,6 @@ func (sqlColumn SQLColumn) isExpr() bool {
 
 type SQLExpr struct {
 	LValue SQLExprValue
-	Op     string
+	Op     token.TokenType
 	RValue SQLExprValue
 }
