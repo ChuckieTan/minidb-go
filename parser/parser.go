@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"minidb-go/parser/ast"
 	"minidb-go/parser/token"
+	"minidb-go/util"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -425,6 +426,7 @@ func (parser *Parser) tree(tokenTypeList ...token.TokenType) bool {
 }
 
 func BenchMark() (err error) {
+	defer util.TimeCost()("parser benchmark")
 	sqls := []string{
 		"create table student (id int, name text);",
 		"select * from student where id = 1;",
@@ -451,6 +453,5 @@ func BenchMark() (err error) {
 		errs[i%1000] = err
 
 	}
-	fmt.Println(errs[99])
 	return
 }
