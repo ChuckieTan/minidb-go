@@ -2,7 +2,7 @@ package parser
 
 import (
 	"fmt"
-	"minidb-go/ast"
+	"minidb-go/parser/ast"
 	"minidb-go/parser/token"
 	"strconv"
 
