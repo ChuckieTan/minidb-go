@@ -31,7 +31,7 @@ func NewLexer(_sql string) (lexer Lexer, err error) {
 	lexer = Lexer{sql: _sql, tokenPos: 0, tokenSequence: make([]token.Token, 0)}
 	pos := 0
 	for {
-		resToken, chNum, err := scanToken(&lexer.sql, pos)
+		resToken, chNum, err := scanToken(lexer.sql, pos)
 		if resToken.Type == token.TT_END || resToken.Type == token.TT_ILLEGAL {
 			break
 		}
@@ -83,15 +83,15 @@ var symbolTokenType = map[string]token.TokenType{
 	"%":  token.TT_MOD,
 }
 
-func scanSymbolToken(sql *string, pos int) (token.Token, error) {
-	if pos < len(*sql)-1 {
-		ch := (*sql)[pos : pos+2]
+func scanSymbolToken(sql string, pos int) (token.Token, error) {
+	if pos < len(sql)-1 {
+		ch := sql[pos : pos+2]
 		if tokenType, ok := symbolTokenType[ch]; ok {
 			return token.Token{Type: tokenType, Val: ch}, nil
 		}
 	}
 
-	ch := (*sql)[pos : pos+1]
+	ch := sql[pos : pos+1]
 	if tokenType, ok := symbolTokenType[ch]; ok {
 		return token.Token{Type: tokenType, Val: ch}, nil
 	}
@@ -129,15 +129,15 @@ var keywordTokenType = map[string]token.TokenType{
 	"all":      token.TT_ALL,
 }
 
-func scanLiteralToken(sql *string, pos int) (resToken token.Token, err error) {
+func scanLiteralToken(sql string, pos int) (resToken token.Token, err error) {
 	tokenLen := 1
-	ch := rune((*sql)[pos+tokenLen])
-	for pos+tokenLen < len(*sql) &&
+	ch := rune(sql[pos+tokenLen])
+	for pos+tokenLen < len(sql) &&
 		(unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_') {
 		tokenLen++
-		ch = rune((*sql)[pos+tokenLen])
+		ch = rune(sql[pos+tokenLen])
 	}
-	word := (*sql)[pos : pos+tokenLen]
+	word := sql[pos : pos+tokenLen]
 	word = strings.ToLower(word)
 
 	if tokenType, ok := keywordTokenType[word]; ok {
@@ -149,19 +149,19 @@ func scanLiteralToken(sql *string, pos int) (resToken token.Token, err error) {
 	return resToken, nil
 }
 
-func scanNumberToken(sql *string, pos int) (resToken token.Token, err error) {
+func scanNumberToken(sql string, pos int) (resToken token.Token, err error) {
 	tokenLen, numOfDot := 0, 0
 
-	ch := rune((*sql)[pos+tokenLen])
-	for pos+tokenLen < len(*sql) &&
+	ch := rune(sql[pos+tokenLen])
+	for pos+tokenLen < len(sql) &&
 		(unicode.IsDigit(ch) || ch == '.') {
 		if ch == '.' {
 			numOfDot++
 		}
 		tokenLen++
-		ch = rune((*sql)[pos+tokenLen])
+		ch = rune(sql[pos+tokenLen])
 	}
-	word := (*sql)[pos : pos+tokenLen]
+	word := sql[pos : pos+tokenLen]
 
 	switch numOfDot {
 	case 0:
@@ -178,32 +178,32 @@ func scanNumberToken(sql *string, pos int) (resToken token.Token, err error) {
 	return resToken, err
 }
 
-func scanStringToken(sql *string, pos int) (
+func scanStringToken(sql string, pos int) (
 	resToken token.Token,
 	err error,
 ) {
-	if (*sql)[pos] != '\'' {
+	if sql[pos] != '\'' {
 		err = fmt.Errorf("not a string")
 		return
 	}
 	tokenLen := 1
-	for (*sql)[pos+tokenLen] != '\'' {
+	for sql[pos+tokenLen] != '\'' {
 		tokenLen++
 	}
-	resToken = token.Token{Type: token.TT_STRING, Val: (*sql)[pos+1 : pos+tokenLen]}
+	resToken = token.Token{Type: token.TT_STRING, Val: (sql)[pos+1 : pos+tokenLen]}
 	return resToken, nil
 }
 
-func scanToken(sql *string, pos int) (resToken token.Token, chNum int, err error) {
-	if pos >= len(*sql) {
+func scanToken(sql string, pos int) (resToken token.Token, chNum int, err error) {
+	if pos >= len(sql) {
 		return token.Token{Type: token.TT_END, Val: ""}, chNum, nil
 	}
 	// 忽略空白字符
-	for unicode.IsSpace(rune((*sql)[pos])) {
+	for unicode.IsSpace(rune(sql[pos])) {
 		pos++
 		chNum++
 	}
-	ch := rune((*sql)[pos])
+	ch := rune(sql[pos])
 	switch {
 	case unicode.IsDigit(ch):
 		resToken, err = scanNumberToken(sql, pos)

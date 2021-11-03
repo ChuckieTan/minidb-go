@@ -13,8 +13,8 @@ type Parser struct {
 	lexer Lexer
 }
 
-func NewParser(sql *string) (parser Parser, err error) {
-	lexer, err := NewLexer(*sql)
+func NewParser(sql string) (parser Parser, err error) {
+	lexer, err := NewLexer(sql)
 	if err != nil {
 		return parser, err
 	}
@@ -328,4 +328,16 @@ func (parser *Parser) tree(tokenTypeList ...token.TokenType) bool {
 		}
 	}
 	return false
+}
+
+func (parser *Parser) ParseStatement() (err error) {
+	switch parser.lexer.GetCurrentToken().Type {
+	case token.TT_CREATE:
+		_, err = parser.ParseCreateTableStatement()
+	case token.TT_SELECT:
+		_, err = parser.ParseSelectStatement()
+	case token.TT_INSERT:
+		_, err = parser.ParseInsertIntoStatement()
+	}
+	return
 }

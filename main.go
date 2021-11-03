@@ -21,12 +21,26 @@ func init() {
 }
 
 func main() {
+	// sqls := []string{
+	// 	"select * from student where id = 1;",
+	// 	"create table student (id int, name text);",
+	// 	"insert into student values (1, 'tom');",
+	// }
+	// errs := make([]error, 1000)
+	// for i := 1; i < 1000000; i++ {
+	// 	for j := 1; j < len(sqls); j++ {
+	// 		sqlParser, _ := parser.NewParser(sqls[j])
+	// 		err := sqlParser.ParseStatement()
+	// 		errs[i%1000] = err
+	// 	}
+	// }
+	// fmt.Println(errs[99])
 	// util.StartUp()
 	// sql := util.ReadInput()
 	// fmt.Println(sql)
 	// sql := "create table student (id int, name text);"
 	sql := "select * from student where id = 1;"
-	sqlParser, _ := parser.NewParser(&sql)
+	sqlParser, _ := parser.NewParser(sql)
 	fmt.Println(sqlParser.ParseSelectStatement())
 	lexer, err := parser.NewLexer(sql)
 	if err == nil {
