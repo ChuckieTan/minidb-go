@@ -432,6 +432,10 @@ func (parser *Parser) ParseStatement() (err error) {
 		_, err = parser.ParseSelectStatement()
 	case token.TT_INSERT:
 		_, err = parser.ParseInsertIntoStatement()
+	case token.TT_UPDATE:
+		_, err = parser.ParseUpdateStatement()
+	case token.TT_DELETE:
+		_, err = parser.ParseDeleteStatement()
 	}
 	return
 }

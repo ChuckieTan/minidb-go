@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"minidb-go/parser"
-	"minidb-go/parser/token"
 	"minidb-go/util"
 	"os"
 
@@ -21,36 +20,37 @@ func init() {
 }
 
 func main() {
-	// sqls := []string{
-	// 	"select * from student where id = 1;",
-	// 	"create table student (id int, name text);",
-	// 	"insert into student values (1, 'tom');",
-	// }
-	// errs := make([]error, 1000)
-	// for i := 1; i < 1000000; i++ {
-	// 	for j := 1; j < len(sqls); j++ {
-	// 		sqlParser, _ := parser.NewParser(sqls[j])
-	// 		err := sqlParser.ParseStatement()
-	// 		errs[i%1000] = err
-	// 	}
-	// }
-	// fmt.Println(errs[99])
+	sqls := []string{
+		"create table student (id int, name text);",
+		"select * from student where id = 1;",
+		"insert into student values (1, 'tom');",
+		"update student set id = 1, name = 'tom' where id = 1;",
+		"delete from student where id = 1;",
+	}
+	errs := make([]error, 1000)
+	for i := 0; i < 3000000; i++ {
+		sqlParser, _ := parser.NewParser(sqls[i%len(sqls)])
+		err := sqlParser.ParseStatement()
+		errs[i%1000] = err
+
+	}
+	fmt.Println(errs[99])
 	// util.StartUp()
 	// sql := util.ReadInput()
 	// fmt.Println(sql)
 	// sql := "create table student (id int, name text);"
 	// sql := "select * from student where id = 1;"
 	// sql := "update student set id = 1, name = 'tom' where id = 1;"
-	sql := "delete from student where id = 1;"
-	sqlParser, _ := parser.NewParser(sql)
-	fmt.Println(sqlParser.ParseDeleteStatement())
-	lexer, err := parser.NewLexer(sql)
-	if err == nil {
-		t := lexer.GetNextToken()
-		fmt.Println(t.Val)
-		for t.Type != token.TT_END {
-			t = lexer.GetNextToken()
-			fmt.Println(t.Val)
-		}
-	}
+	// sql := "delete from student where id = 1;"
+	// sqlParser, _ := parser.NewParser(sql)
+	// fmt.Println(sqlParser.ParseDeleteStatement())
+	// lexer, err := parser.NewLexer(sql)
+	// if err == nil {
+	// 	t := lexer.GetNextToken()
+	// 	fmt.Println(t.Val)
+	// 	for t.Type != token.TT_END {
+	// 		t = lexer.GetNextToken()
+	// 		fmt.Println(t.Val)
+	// 	}
+	// }
 }
