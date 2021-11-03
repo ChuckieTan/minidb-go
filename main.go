@@ -39,9 +39,11 @@ func main() {
 	// sql := util.ReadInput()
 	// fmt.Println(sql)
 	// sql := "create table student (id int, name text);"
-	sql := "select * from student where id = 1;"
+	// sql := "select * from student where id = 1;"
+	// sql := "update student set id = 1, name = 'tom' where id = 1;"
+	sql := "delete from student where id = 1;"
 	sqlParser, _ := parser.NewParser(sql)
-	fmt.Println(sqlParser.ParseSelectStatement())
+	fmt.Println(sqlParser.ParseDeleteStatement())
 	lexer, err := parser.NewLexer(sql)
 	if err == nil {
 		t := lexer.GetNextToken()

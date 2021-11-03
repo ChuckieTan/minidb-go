@@ -183,7 +183,7 @@ func (parser *Parser) ParseSelectStatement() (
 	return statement, nil
 }
 
-func (parser *Parser) parseUpdateStatement() (
+func (parser *Parser) ParseUpdateStatement() (
 	statement ast.UpdateStatement, err error) {
 	if !parser.match(token.TT_UPDATE) {
 		err = fmt.Errorf("not a update statement")
@@ -229,6 +229,27 @@ func (parser *Parser) parseUpdateStatement() (
 	return statement, err
 }
 
+func (parser *Parser) ParseDeleteStatement() (
+	statement ast.DeleteStatement, err error,
+) {
+	if !parser.chain(token.TT_DELETE, token.TT_FROM) {
+		err = fmt.Errorf("not a delete statement")
+		log.Error(err.Error())
+		return
+	}
+
+	statement.TableSource, err = parser.parseTableName()
+	if err != nil {
+		return
+	}
+
+	statement.Where, err = parser.parseWhere()
+	if err != nil {
+		return
+	}
+	return statement, err
+}
+
 func (parser *Parser) parseColumnAssign() (
 	columnAssign ast.ColumnAssign, err error,
 ) {
@@ -240,7 +261,7 @@ func (parser *Parser) parseColumnAssign() (
 		return
 	}
 
-	if t := parser.lexer.GetCurrentToken(); !parser.match(token.TT_IDENTIFIER) {
+	if t := parser.lexer.GetCurrentToken(); !parser.match(token.TT_ASSIGN) {
 		err = fmt.Errorf("expected '=', found '%v'", t.Val)
 		log.Error(err.Error())
 		return
