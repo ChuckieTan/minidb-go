@@ -181,7 +181,78 @@ func (parser *Parser) ParseSelectStatement() (
 		return
 	}
 	return statement, nil
+}
 
+func (parser *Parser) parseUpdateStatement() (
+	statement ast.UpdateStatement, err error) {
+	if !parser.match(token.TT_UPDATE) {
+		err = fmt.Errorf("not a update statement")
+		return
+	}
+
+	statement.TableSource, err = parser.parseTableName()
+	if err != nil {
+		return
+	}
+
+	if t := parser.lexer.GetCurrentToken(); !parser.match(token.TT_SET) {
+		err = fmt.Errorf("expected 'set', found '%v'", t.Val)
+		log.Error(err.Error())
+		return
+	}
+
+	// 循环获取赋值
+	for {
+		columnAssign, err := parser.parseColumnAssign()
+		if err != nil {
+			return statement, err
+		}
+		statement.ColumnAssignList = append(statement.ColumnAssignList, columnAssign)
+
+		if !parser.match(token.TT_COMMA) {
+			break
+		}
+	}
+
+	if t := parser.lexer.GetCurrentToken(); t.Type != token.TT_WHERE {
+		err = fmt.Errorf("expected 'where', found '%v'", t.Val)
+		log.Error(err.Error())
+		return
+	}
+
+	statement.Where, err = parser.parseWhere()
+
+	if err != nil {
+		return
+	}
+
+	return statement, err
+}
+
+func (parser *Parser) parseColumnAssign() (
+	columnAssign ast.ColumnAssign, err error,
+) {
+	if t := parser.lexer.GetCurrentToken(); parser.match(token.TT_IDENTIFIER) {
+		columnAssign.ColumnName = t.Val
+	} else {
+		err = fmt.Errorf("expected table name, found '%v'", t.Val)
+		log.Error(err.Error())
+		return
+	}
+
+	if t := parser.lexer.GetCurrentToken(); !parser.match(token.TT_IDENTIFIER) {
+		err = fmt.Errorf("expected '=', found '%v'", t.Val)
+		log.Error(err.Error())
+		return
+	}
+
+	columnAssign.Value, err = parser.parseExprValue()
+
+	if err != nil {
+		return
+	}
+
+	return columnAssign, err
 }
 
 func (parser *Parser) parseWhere() (
@@ -199,7 +270,8 @@ func (parser *Parser) parseWhere() (
 }
 
 func (parser *Parser) parseExpr() (
-	expr ast.SQLExpr, err error) {
+	expr ast.SQLExpr, err error,
+) {
 	expr.LValue, err = parser.parseExprValue()
 	if err != nil {
 		return
@@ -216,7 +288,8 @@ func (parser *Parser) parseExpr() (
 }
 
 func (parse *Parser) parseExprValue() (
-	exprValue ast.SQLExprValue, err error) {
+	exprValue ast.SQLExprValue, err error,
+) {
 	resToken := parse.lexer.GetCurrentToken()
 	if resToken.Type == token.TT_IDENTIFIER {
 		parse.lexer.GetNextToken()
