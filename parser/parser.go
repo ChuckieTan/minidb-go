@@ -424,18 +424,33 @@ func (parser *Parser) tree(tokenTypeList ...token.TokenType) bool {
 	return false
 }
 
-func (parser *Parser) ParseStatement() (err error) {
-	switch parser.lexer.GetCurrentToken().Type {
-	case token.TT_CREATE:
-		_, err = parser.ParseCreateTableStatement()
-	case token.TT_SELECT:
-		_, err = parser.ParseSelectStatement()
-	case token.TT_INSERT:
-		_, err = parser.ParseInsertIntoStatement()
-	case token.TT_UPDATE:
-		_, err = parser.ParseUpdateStatement()
-	case token.TT_DELETE:
-		_, err = parser.ParseDeleteStatement()
+func BenchMark() (err error) {
+	sqls := []string{
+		"create table student (id int, name text);",
+		"select * from student where id = 1;",
+		"insert into student values (1, 'tom');",
+		"update student set id = 1, name = 'tom' where id = 1;",
+		"delete from student where id = 1;",
 	}
+	errs := make([]error, 1000)
+	for i := 0; i < 3000000; i++ {
+		sqlParser, _ := NewParser(sqls[i%len(sqls)])
+		var err error
+		switch sqlParser.lexer.GetCurrentToken().Type {
+		case token.TT_CREATE:
+			_, err = sqlParser.ParseCreateTableStatement()
+		case token.TT_SELECT:
+			_, err = sqlParser.ParseSelectStatement()
+		case token.TT_INSERT:
+			_, err = sqlParser.ParseInsertIntoStatement()
+		case token.TT_UPDATE:
+			_, err = sqlParser.ParseUpdateStatement()
+		case token.TT_DELETE:
+			_, err = sqlParser.ParseDeleteStatement()
+		}
+		errs[i%1000] = err
+
+	}
+	fmt.Println(errs[99])
 	return
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"minidb-go/parser"
 	"minidb-go/util"
 	"os"
@@ -20,21 +19,6 @@ func init() {
 }
 
 func main() {
-	sqls := []string{
-		"create table student (id int, name text);",
-		"select * from student where id = 1;",
-		"insert into student values (1, 'tom');",
-		"update student set id = 1, name = 'tom' where id = 1;",
-		"delete from student where id = 1;",
-	}
-	errs := make([]error, 1000)
-	for i := 0; i < 3000000; i++ {
-		sqlParser, _ := parser.NewParser(sqls[i%len(sqls)])
-		err := sqlParser.ParseStatement()
-		errs[i%1000] = err
-
-	}
-	fmt.Println(errs[99])
 	// util.StartUp()
 	// sql := util.ReadInput()
 	// fmt.Println(sql)
@@ -53,4 +37,5 @@ func main() {
 	// 		fmt.Println(t.Val)
 	// 	}
 	// }
+	parser.BenchMark()
 }
