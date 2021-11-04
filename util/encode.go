@@ -1,4 +1,4 @@
-package pager
+package util
 
 import (
 	"encoding/binary"
