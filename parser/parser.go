@@ -387,7 +387,7 @@ func (parser *Parser) parseNumericValue(sign int, numToken token.Token) (
 			log.Error(err.Error())
 			return
 		}
-		return ast.SQLInt(float64(sign) * v), nil
+		return ast.SQLFloat(float64(sign) * v), nil
 	default:
 		err = fmt.Errorf("expected a value, given '%v'", numToken.Val)
 		log.Error(err.Error())
