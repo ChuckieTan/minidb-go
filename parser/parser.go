@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"minidb-go/parser/ast"
 	"minidb-go/parser/token"
-	"minidb-go/util"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -21,6 +20,24 @@ func NewParser(sql string) (parser Parser, err error) {
 	}
 	parser.lexer = lexer
 	return parser, nil
+}
+
+func (parser *Parser) ParseStatement() (
+	statement ast.SQLStatement, err error,
+) {
+	switch parser.lexer.GetCurrentToken().Type {
+	case token.TT_CREATE:
+		statement, err = parser.ParseCreateTableStatement()
+	case token.TT_SELECT:
+		statement, err = parser.ParseSelectStatement()
+	case token.TT_INSERT:
+		statement, err = parser.ParseInsertIntoStatement()
+	case token.TT_UPDATE:
+		statement, err = parser.ParseUpdateStatement()
+	case token.TT_DELETE:
+		statement, err = parser.ParseDeleteStatement()
+	}
+	return statement, err
 }
 
 func (parser *Parser) ParseCreateTableStatement() (
@@ -155,7 +172,8 @@ func (parser *Parser) ParseSelectStatement() (
 		}
 	}
 	if t := parser.lexer.GetCurrentToken(); !parser.match(token.TT_FROM) {
-		log.Error("expected 'from', found '%v'", t.Val)
+		err = fmt.Errorf("expected 'from', found '%v'", t.Val)
+		log.Error(err.Error())
 	}
 
 	if t := parser.lexer.GetCurrentToken(); parser.match(token.TT_IDENTIFIER) {
@@ -423,35 +441,4 @@ func (parser *Parser) tree(tokenTypeList ...token.TokenType) bool {
 		}
 	}
 	return false
-}
-
-func BenchMark() (err error) {
-	defer util.TimeCost()("parser benchmark")
-	sqls := []string{
-		"create table student (id int, name text);",
-		"select * from student where id = 1;",
-		"insert into student values (1, 'tom');",
-		"update student set id = 1, name = 'tom' where id = 1;",
-		"delete from student where id = 1;",
-	}
-	errs := make([]error, 1000)
-	for i := 0; i < 3000000; i++ {
-		sqlParser, _ := NewParser(sqls[i%len(sqls)])
-		var err error
-		switch sqlParser.lexer.GetCurrentToken().Type {
-		case token.TT_CREATE:
-			_, err = sqlParser.ParseCreateTableStatement()
-		case token.TT_SELECT:
-			_, err = sqlParser.ParseSelectStatement()
-		case token.TT_INSERT:
-			_, err = sqlParser.ParseInsertIntoStatement()
-		case token.TT_UPDATE:
-			_, err = sqlParser.ParseUpdateStatement()
-		case token.TT_DELETE:
-			_, err = sqlParser.ParseDeleteStatement()
-		}
-		errs[i%1000] = err
-
-	}
-	return
 }

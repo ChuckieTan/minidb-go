@@ -10,3 +10,7 @@ type UpdateStatement struct {
 	ColumnAssignList []ColumnAssign
 	Where            WhereStatement
 }
+
+func (statement UpdateStatement) StatementType() string {
+	return "Update"
+}

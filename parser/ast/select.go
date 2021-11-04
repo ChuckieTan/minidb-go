@@ -5,3 +5,7 @@ type SelectStatement struct {
 	TableSource string
 	Where       WhereStatement
 }
+
+func (statement SelectStatement) StatementType() string {
+	return "Select"
+}

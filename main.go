@@ -26,19 +26,17 @@ func init() {
 
 func dump() {
 	type P struct {
-		X, Y *int64
+		X, Y int64
 	}
 	v := [253]P{}
-	// v := [190]P{}
-	// for i := 0; i < len(v); i++ {
-	// 	v[i].X = math.MaxInt64
-	// 	v[i].Y = math.MaxInt64
-	// }
+	for i := 0; i < len(v); i++ {
+		v[i].X = math.MaxInt64
+		v[i].Y = math.MaxInt64
+	}
 	defer util.TimeCost()("dump benchmark")
 	var d []byte
 	for i := 0; i < 100000; i++ {
 		d, _ = pager.Encode(v)
-		// fmt.Println(len(d))
 	}
 	fmt.Println(len(d))
 }

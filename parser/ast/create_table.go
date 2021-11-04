@@ -30,3 +30,7 @@ type CreateTableStatement struct {
 	TableName       string
 	ColumnDeineList []ColumnDefine
 }
+
+func (statement CreateTableStatement) StatementType() string {
+	return "Create table"
+}
