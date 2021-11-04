@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func dumpType(buffer *[]byte, origin interface{}) (err error) {
+func encodeType(buffer *[]byte, origin interface{}) (err error) {
 	fieldType := reflect.TypeOf(origin).Kind()
 	// reflect 性能比类型断言低
 	// fieldValue := reflect.ValueOf(origin)
@@ -21,13 +21,13 @@ func dumpType(buffer *[]byte, origin interface{}) (err error) {
 	switch exprValue := origin.(type) {
 	case ast.SQLInt:
 		origin = int64(exprValue)
-		dumpType(buffer, int8(0))
+		encodeType(buffer, int8(0))
 	case ast.SQLFloat:
 		origin = float64(exprValue)
-		dumpType(buffer, int8(1))
+		encodeType(buffer, int8(1))
 	case ast.SQLText:
 		origin = string(exprValue)
-		dumpType(buffer, int8(2))
+		encodeType(buffer, int8(2))
 	case ast.SQLColumn:
 		origin = string(exprValue)
 	case token.TokenType:
@@ -77,38 +77,42 @@ func dumpType(buffer *[]byte, origin interface{}) (err error) {
 		binary.LittleEndian.PutUint64(buff, bits)
 		*buffer = append(*buffer, buff...)
 
+	// 指针不进行序列化
+	case reflect.Ptr:
+		return
+
 	case reflect.String:
-		err = dumpString(buffer, origin.(string))
+		err = encodeString(buffer, origin.(string))
 
 	case reflect.Array:
-		err = dumpArray(buffer, origin)
+		err = encodeArray(buffer, origin)
 
 	case reflect.Slice:
-		err = dumpSlice(buffer, origin)
+		err = encodeSlice(buffer, origin)
 
 	case reflect.Struct:
-		err = dumpStruct(buffer, origin)
+		err = encodeStruct(buffer, origin)
 
 	default:
-		err = fmt.Errorf("dump: unsupported type: %v", fieldType)
+		err = fmt.Errorf("encode: unsupported type: %v", fieldType)
 		log.Error(err.Error())
 		return
 	}
 	return
 }
 
-func dumpString(buffer *[]byte, str string) (err error) {
+func encodeString(buffer *[]byte, str string) (err error) {
 	// 先写字符串长度，再写数据
-	dumpType(buffer, len(str))
+	encodeType(buffer, len(str))
 	*buffer = append(*buffer, []byte(str)...)
 	return nil
 }
 
-func dumpArray(buffer *[]byte, origin interface{}) (err error) {
+func encodeArray(buffer *[]byte, origin interface{}) (err error) {
 	value := reflect.ValueOf(origin)
 
 	for i := 0; i < value.Len(); i++ {
-		err = dumpType(buffer, value.Index(i).Interface())
+		err = encodeType(buffer, value.Index(i).Interface())
 		if err != nil {
 			return
 		}
@@ -116,13 +120,13 @@ func dumpArray(buffer *[]byte, origin interface{}) (err error) {
 	return
 }
 
-func dumpSlice(buffer *[]byte, origin interface{}) (err error) {
+func encodeSlice(buffer *[]byte, origin interface{}) (err error) {
 	value := reflect.ValueOf(origin)
 
 	// 写入 slice 长度
-	dumpType(buffer, value.Len())
+	encodeType(buffer, value.Len())
 	for i := 0; i < value.Len(); i++ {
-		err = dumpType(buffer, value.Index(i).Interface())
+		err = encodeType(buffer, value.Index(i).Interface())
 		if err != nil {
 			return
 		}
@@ -130,13 +134,13 @@ func dumpSlice(buffer *[]byte, origin interface{}) (err error) {
 	return
 }
 
-func dumpStruct(buffer *[]byte, origin interface{}) (err error) {
+func encodeStruct(buffer *[]byte, origin interface{}) (err error) {
 	typeOfV := reflect.TypeOf(origin)
 	valueOfV := reflect.ValueOf(origin)
 
 	for i := 0; i < typeOfV.NumField(); i++ {
 		fieldValue := valueOfV.Field(i).Interface()
-		err = dumpType(buffer, fieldValue)
+		err = encodeType(buffer, fieldValue)
 		if err != nil {
 			return err
 		}
@@ -144,7 +148,7 @@ func dumpStruct(buffer *[]byte, origin interface{}) (err error) {
 	return nil
 }
 
-func Dump(origin interface{}) (bin []byte, err error) {
-	err = dumpType(&bin, origin)
+func Encode(origin interface{}) (bin []byte, err error) {
+	err = encodeType(&bin, origin)
 	return bin, err
 }
