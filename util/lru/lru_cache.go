@@ -1,4 +1,4 @@
-package pager
+package lru
 
 import (
 	"container/list"

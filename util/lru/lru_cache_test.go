@@ -1,13 +1,13 @@
-package pager_test
+package lru_test
 
 import (
-	"minidb-go/pager"
+	"minidb-go/util/lru"
 	"testing"
 )
 
 func TestCache(t *testing.T) {
-	cache := pager.NewLRU(2)
-	cache.OnEvicted = func(key pager.Key, value interface{}) {
+	cache := lru.NewLRU(2)
+	cache.OnEvicted = func(key lru.Key, value interface{}) {
 		t.Log("remove: ", key, value)
 	}
 	type P struct {
