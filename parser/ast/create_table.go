@@ -1,6 +1,6 @@
 package ast
 
-type ColumnType int
+type ColumnType uint8
 
 const (
 	CT_INT = iota
