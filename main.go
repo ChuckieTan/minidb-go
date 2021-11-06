@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"minidb-go/parser"
 	"minidb-go/parser/ast"
 	"minidb-go/util"
 	"os"
@@ -53,15 +52,23 @@ func main() {
 	t := reflect.ValueOf(q.X)
 	fmt.Println(t)
 
-	sql := "delete from student where id = -1.2;"
-	sqlParser, _ := parser.NewParser(sql)
-	statement, _ := sqlParser.ParseDeleteStatement()
-	fmt.Println(statement)
-
-	// util.Encode(buff, statement)
-	// fmt.Println(buff.Bytes())
+	// sql := "delete from student where id = -1.2;"
+	// sqlParser, _ := parser.NewParser(sql)
+	// statement, _ := sqlParser.ParseDeleteStatement()
+	// fmt.Println(statement)
 	// d := ast.DeleteStatement{}
-	// util.Decode(buff, &d)
+
+	// sql := "create table student (id int, name text);"
+	// sqlParser, _ := parser.NewParser(sql)
+	// statement, _ := sqlParser.ParseCreateTableStatement()
+	// fmt.Println(statement)
+	// d := ast.CreateTableStatement{}
+
+	statement := ast.ColumnType(1)
+	d := ast.ColumnType(2)
+	util.Encode(buff, statement)
+	fmt.Println(buff.Bytes())
+	util.Decode(buff, &d)
 	// fmt.Println(d)
 	// lexer, err := parser.NewLexer(sql)
 	// if err == nil {

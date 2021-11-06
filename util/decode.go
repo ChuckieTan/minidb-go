@@ -12,8 +12,9 @@ import (
 
 func decodeType(r io.Reader, v reflect.Value) (err error) {
 	switch value := v.Interface().(type) {
-	case ast.SQLExprValue:
-		err = decodeSQLExprValue(r, v)
+	case ast.ColumnType:
+		err = binary.Read(r, binary.BigEndian, &value)
+		v.SetUint(uint64(ast.ColumnType(value)))
 	case bool:
 		err = binary.Read(r, binary.BigEndian, &value)
 		v.SetBool(value)
