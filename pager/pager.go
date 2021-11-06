@@ -7,9 +7,9 @@ import (
 
 type TableDefine struct {
 	TableName       string
-	RootAddr        uint64
-	FirstLeafAddr   uint64
-	LastLeafAddr    uint64
+	RootAddr        uint32
+	FirstLeafAddr   uint32
+	LastLeafAddr    uint32
 	ColumnDeineList []ast.ColumnDefine
 }
 

@@ -18,7 +18,8 @@ func BenchmarkEncode(b *testing.B) {
 		v[i].Y = math.MaxInt64
 	}
 	for i := 0; i < b.N; i++ {
-		util.Encode(v)
+		buff := bytes.Buffer{}
+		util.Encode(&buff, v)
 	}
 }
 

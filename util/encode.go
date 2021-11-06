@@ -3,6 +3,7 @@ package util
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
 	"minidb-go/parser/ast"
 	"minidb-go/parser/token"
@@ -11,7 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func encodeType(buffer *[]byte, origin interface{}) (err error) {
+func encodeType(buffer io.Writer, origin interface{}) (err error) {
 	fieldType := reflect.TypeOf(origin).Kind()
 	// reflect 性能比类型断言低
 	// fieldValue := reflect.ValueOf(origin)
@@ -41,7 +42,7 @@ func encodeType(buffer *[]byte, origin interface{}) (err error) {
 		if bitSet {
 			bitSetByte = 1
 		}
-		*buffer = append(*buffer, bitSetByte)
+		buffer.Write([]byte{bitSetByte})
 
 	case reflect.Int8:
 		bitSet := origin.(int8)
@@ -49,33 +50,33 @@ func encodeType(buffer *[]byte, origin interface{}) (err error) {
 		if bitSet == 1 {
 			bitSetByte = 1
 		}
-		*buffer = append(*buffer, bitSetByte)
+		buffer.Write([]byte{bitSetByte})
 
 	case reflect.Int:
 		buff := make([]byte, 4)
 		binary.LittleEndian.PutUint32(buff, uint32(origin.(int)))
-		*buffer = append(*buffer, buff...)
+		buffer.Write(buff)
 
 	case reflect.Int32:
 		buff := make([]byte, 4)
 		binary.LittleEndian.PutUint32(buff, uint32(origin.(int32)))
-		*buffer = append(*buffer, buff...)
+		buffer.Write(buff)
 
 	case reflect.Int64:
 		buff := make([]byte, 8)
 		binary.LittleEndian.PutUint64(buff, uint64(origin.(int64)))
-		*buffer = append(*buffer, buff...)
+		buffer.Write(buff)
 
 	case reflect.Uint64:
 		buff := make([]byte, 8)
 		binary.LittleEndian.PutUint64(buff, origin.(uint64))
-		*buffer = append(*buffer, buff...)
+		buffer.Write(buff)
 
 	case reflect.Float64:
 		bits := math.Float64bits(origin.(float64))
 		buff := make([]byte, 8)
 		binary.LittleEndian.PutUint64(buff, bits)
-		*buffer = append(*buffer, buff...)
+		buffer.Write(buff)
 
 	// 指针不进行序列化
 	case reflect.Ptr:
@@ -101,14 +102,14 @@ func encodeType(buffer *[]byte, origin interface{}) (err error) {
 	return
 }
 
-func encodeString(buffer *[]byte, str string) (err error) {
+func encodeString(buffer io.Writer, str string) (err error) {
 	// 先写字符串长度，再写数据
 	encodeType(buffer, len(str))
-	*buffer = append(*buffer, []byte(str)...)
+	buffer.Write([]byte(str))
 	return nil
 }
 
-func encodeArray(buffer *[]byte, origin interface{}) (err error) {
+func encodeArray(buffer io.Writer, origin interface{}) (err error) {
 	value := reflect.ValueOf(origin)
 
 	for i := 0; i < value.Len(); i++ {
@@ -120,7 +121,7 @@ func encodeArray(buffer *[]byte, origin interface{}) (err error) {
 	return
 }
 
-func encodeSlice(buffer *[]byte, origin interface{}) (err error) {
+func encodeSlice(buffer io.Writer, origin interface{}) (err error) {
 	value := reflect.ValueOf(origin)
 
 	// 写入 slice 长度
@@ -134,7 +135,7 @@ func encodeSlice(buffer *[]byte, origin interface{}) (err error) {
 	return
 }
 
-func encodeStruct(buffer *[]byte, origin interface{}) (err error) {
+func encodeStruct(buffer io.Writer, origin interface{}) (err error) {
 	typeOfV := reflect.TypeOf(origin)
 	valueOfV := reflect.ValueOf(origin)
 
@@ -148,7 +149,7 @@ func encodeStruct(buffer *[]byte, origin interface{}) (err error) {
 	return nil
 }
 
-func Encode(origin interface{}) (bin []byte, err error) {
-	err = encodeType(&bin, origin)
-	return bin, err
+func Encode(w io.Writer, origin interface{}) (err error) {
+	err = encodeType(w, origin)
+	return err
 }
