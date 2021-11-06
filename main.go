@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"minidb-go/parser"
 	"minidb-go/util"
@@ -26,6 +27,21 @@ func main() {
 	// sql := "create table student (id int, name text);"
 	// sql := "select * from student where id = 1;"
 	// sql := "update student set id = 1, name = 'tom' where id = 1;"
+
+	buff := new(bytes.Buffer)
+	type P struct {
+		X, Y int32
+		Arr  []int32
+	}
+	p := P{1, 2, []int32{1, 2, 3, 4, 5}}
+	q := new(P)
+	// p := []int32{1, 2, 3, 4, 5}
+	// var q []int32
+	util.Encode(buff, p)
+	fmt.Println(buff.Bytes())
+	util.Decode(buff, q)
+	fmt.Println(q)
+
 	sql := "delete from student where id = -1.2;"
 	sqlParser, _ := parser.NewParser(sql)
 	statement, _ := sqlParser.ParseDeleteStatement()

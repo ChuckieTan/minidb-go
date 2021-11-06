@@ -38,4 +38,7 @@ func BenchmarkGobEncode(b *testing.B) {
 		enc := gob.NewEncoder(&network)
 		enc.Encode(v)
 	}
+	buff := bytes.Buffer{}
+	dec := gob.NewDecoder(&buff)
+	dec.Decode(&buff)
 }

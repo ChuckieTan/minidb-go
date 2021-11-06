@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"math"
 	"minidb-go/parser/ast"
 	"minidb-go/parser/token"
 	"reflect"
@@ -13,70 +12,36 @@ import (
 )
 
 func encodeType(buffer io.Writer, origin interface{}) (err error) {
-	fieldType := reflect.TypeOf(origin).Kind()
-	// reflect 性能比类型断言低
-	// fieldValue := reflect.ValueOf(origin)
+	if reflect.TypeOf(origin).Kind() != reflect.Slice {
+		// 尝试写入定长数据
+		werr := binary.Write(buffer, binary.BigEndian, origin)
+		if werr == nil {
+			return
+		}
+	}
 
 	// 转换 SQL 数据类型
 	// 0 INT, 1 FLOAT, 2 STRING
 	switch exprValue := origin.(type) {
 	case ast.SQLInt:
 		origin = int64(exprValue)
-		encodeType(buffer, int8(0))
+		err = binary.Write(buffer, binary.BigEndian, int8(0))
 	case ast.SQLFloat:
 		origin = float64(exprValue)
-		encodeType(buffer, int8(1))
+		err = binary.Write(buffer, binary.BigEndian, int8(1))
 	case ast.SQLText:
 		origin = string(exprValue)
-		encodeType(buffer, int8(2))
+		err = binary.Write(buffer, binary.BigEndian, int8(2))
 	case ast.SQLColumn:
 		origin = string(exprValue)
 	case token.TokenType:
 		origin = int(exprValue)
 	}
 
-	switch fieldType {
-	case reflect.Bool:
-		bitSet := origin.(bool)
-		var bitSetByte byte
-		if bitSet {
-			bitSetByte = 1
-		}
-		buffer.Write([]byte{bitSetByte})
-
-	case reflect.Int8:
-		bitSet := origin.(int8)
-		var bitSetByte byte
-		if bitSet == 1 {
-			bitSetByte = 1
-		}
-		buffer.Write([]byte{bitSetByte})
-
+	switch fieldType := reflect.TypeOf(origin).Kind(); fieldType {
+	// int 不是定长，转换为 int32
 	case reflect.Int:
-		buff := make([]byte, 4)
-		binary.LittleEndian.PutUint32(buff, uint32(origin.(int)))
-		buffer.Write(buff)
-
-	case reflect.Int32:
-		buff := make([]byte, 4)
-		binary.LittleEndian.PutUint32(buff, uint32(origin.(int32)))
-		buffer.Write(buff)
-
-	case reflect.Int64:
-		buff := make([]byte, 8)
-		binary.LittleEndian.PutUint64(buff, uint64(origin.(int64)))
-		buffer.Write(buff)
-
-	case reflect.Uint64:
-		buff := make([]byte, 8)
-		binary.LittleEndian.PutUint64(buff, origin.(uint64))
-		buffer.Write(buff)
-
-	case reflect.Float64:
-		bits := math.Float64bits(origin.(float64))
-		buff := make([]byte, 8)
-		binary.LittleEndian.PutUint64(buff, bits)
-		buffer.Write(buff)
+		err = binary.Write(buffer, binary.BigEndian, int32(origin.(int)))
 
 	// 指针不进行序列化
 	case reflect.Ptr:
@@ -85,11 +50,11 @@ func encodeType(buffer io.Writer, origin interface{}) (err error) {
 	case reflect.String:
 		err = encodeString(buffer, origin.(string))
 
-	case reflect.Array:
-		err = encodeArray(buffer, origin)
-
 	case reflect.Slice:
 		err = encodeSlice(buffer, origin)
+
+	case reflect.Array:
+		err = encodeArray(buffer, origin)
 
 	case reflect.Struct:
 		err = encodeStruct(buffer, origin)
@@ -109,9 +74,11 @@ func encodeString(buffer io.Writer, str string) (err error) {
 	return nil
 }
 
-func encodeArray(buffer io.Writer, origin interface{}) (err error) {
+func encodeSlice(buffer io.Writer, origin interface{}) (err error) {
 	value := reflect.ValueOf(origin)
 
+	// 写入 slice 长度
+	encodeType(buffer, value.Len())
 	for i := 0; i < value.Len(); i++ {
 		err = encodeType(buffer, value.Index(i).Interface())
 		if err != nil {
@@ -121,11 +88,9 @@ func encodeArray(buffer io.Writer, origin interface{}) (err error) {
 	return
 }
 
-func encodeSlice(buffer io.Writer, origin interface{}) (err error) {
+func encodeArray(buffer io.Writer, origin interface{}) (err error) {
 	value := reflect.ValueOf(origin)
 
-	// 写入 slice 长度
-	encodeType(buffer, value.Len())
 	for i := 0; i < value.Len(); i++ {
 		err = encodeType(buffer, value.Index(i).Interface())
 		if err != nil {
