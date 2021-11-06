@@ -12,7 +12,8 @@ func BenchmarkEncode(b *testing.B) {
 	type P struct {
 		X, Y int64
 	}
-	v := [253]P{}
+	// v := [253]P{}
+	v := make([]P, 253)
 	for i := 0; i < len(v); i++ {
 		v[i].X = math.MaxInt64
 		v[i].Y = math.MaxInt64
@@ -27,7 +28,8 @@ func BenchmarkGobEncode(b *testing.B) {
 	type P struct {
 		X, Y int64
 	}
-	v := [253]P{}
+	// v := [253]P{}
+	v := make([]P, 253)
 	for i := 0; i < len(v); i++ {
 		v[i].X = math.MaxInt64
 		v[i].Y = math.MaxInt64

@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"minidb-go/parser"
+	"minidb-go/parser/ast"
 	"minidb-go/util"
 	"os"
+	"reflect"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -29,23 +31,38 @@ func main() {
 	// sql := "update student set id = 1, name = 'tom' where id = 1;"
 
 	buff := new(bytes.Buffer)
+	// type P struct {
+	// 	X, Y int32
+	// 	Arr  []int32
+	// }
 	type P struct {
-		X, Y int32
-		Arr  []int32
+		X ast.SQLExprValue
 	}
-	p := P{1, 2, []int32{1, 2, 3, 4, 5}}
-	q := new(P)
+	// var q ast.SQLExprValue
+	p := P{ast.SQLText("132")}
+	// p := "123"
+	var q = P{}
+	// p := P{1, 2, []int32{1, 2, 3, 4, 5}}
+	// q := new(P)
 	// p := []int32{1, 2, 3, 4, 5}
 	// var q []int32
 	util.Encode(buff, p)
 	fmt.Println(buff.Bytes())
-	util.Decode(buff, q)
-	fmt.Println(q)
+	util.Decode(buff, &q)
+	fmt.Println(p, q)
+	t := reflect.ValueOf(q.X)
+	fmt.Println(t)
 
 	sql := "delete from student where id = -1.2;"
 	sqlParser, _ := parser.NewParser(sql)
 	statement, _ := sqlParser.ParseDeleteStatement()
 	fmt.Println(statement)
+
+	// util.Encode(buff, statement)
+	// fmt.Println(buff.Bytes())
+	// d := ast.DeleteStatement{}
+	// util.Decode(buff, &d)
+	// fmt.Println(d)
 	// lexer, err := parser.NewLexer(sql)
 	// if err == nil {
 	// 	t := lexer.GetNextToken()

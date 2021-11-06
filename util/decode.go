@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"minidb-go/parser/ast"
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
@@ -11,6 +12,8 @@ import (
 
 func decodeType(r io.Reader, v reflect.Value) (err error) {
 	switch value := v.Interface().(type) {
+	case ast.SQLExprValue:
+		err = decodeSQLExprValue(r, v)
 	case bool:
 		err = binary.Read(r, binary.BigEndian, &value)
 		v.SetBool(value)
@@ -38,6 +41,7 @@ func decodeType(r io.Reader, v reflect.Value) (err error) {
 	case float64:
 		err = binary.Read(r, binary.BigEndian, &value)
 		v.SetFloat(float64(value))
+
 	default:
 		switch v.Kind() {
 		case reflect.String:
@@ -48,10 +52,22 @@ func decodeType(r io.Reader, v reflect.Value) (err error) {
 			err = decodeSlice(r, v)
 		case reflect.Struct:
 			err = decodeStruct(r, v)
+		case reflect.Ptr:
+			err = decodeType(r, v.Elem())
+		case reflect.Interface:
+			if v.Addr().CanConvert(reflect.TypeOf((*ast.SQLExprValue)(nil))) {
+				err = decodeSQLExprValue(r, v)
+			} else {
+				err = fmt.Errorf("decode: unsupported type: %T", v.Addr().Interface())
+				log.Error(err.Error())
+				return
+			}
+		default:
+			err = fmt.Errorf("decode: unsupported type: %T", v.Addr().Interface())
+			log.Error(err.Error())
+			return
 		}
 	}
-
-	// v.Set(reflect.ValueOf(value))
 	return
 }
 
@@ -97,6 +113,35 @@ func decodeStruct(r io.Reader, v reflect.Value) (err error) {
 		}
 	}
 	return nil
+}
+
+func decodeSQLExprValue(r io.Reader, v reflect.Value) (err error) {
+	typeNumber := uint8(9)
+	err = binary.Read(r, binary.BigEndian, &typeNumber)
+	if err != nil {
+		return
+	}
+	switch typeNumber {
+	case 0:
+		num := int64(0)
+		err = binary.Read(r, binary.BigEndian, &num)
+		newSQLValue := reflect.New(reflect.TypeOf(ast.SQLInt(0)))
+		newSQLValue.Elem().SetInt(num)
+		v.Set(newSQLValue.Elem())
+	case 1:
+		num := float64(0)
+		err = binary.Read(r, binary.BigEndian, &num)
+		newSQLValue := reflect.New(reflect.TypeOf(ast.SQLFloat(0)))
+		newSQLValue.Elem().SetFloat(num)
+		v.Set(newSQLValue.Elem())
+	case 2, 3:
+		num := ""
+		err = decodeType(r, reflect.ValueOf(&num))
+		newSQLValue := reflect.New(reflect.TypeOf(ast.SQLText("")))
+		newSQLValue.Elem().SetString(num)
+		v.Set(newSQLValue.Elem())
+	}
+	return
 }
 
 func Decode(r io.Reader, origin interface{}) (err error) {
