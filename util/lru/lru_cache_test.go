@@ -7,7 +7,7 @@ import (
 
 func TestCache(t *testing.T) {
 	cache := lru.NewLRU(2)
-	cache.OnEvicted = func(key lru.Key, value interface{}) {
+	cache.OnEvicted = func(key uint32, value interface{}) {
 		t.Log("remove: ", key, value)
 	}
 	type P struct {

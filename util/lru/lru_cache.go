@@ -4,11 +4,9 @@ import (
 	"container/list"
 )
 
-type Key uint64
-
 type Cache struct {
 	MaxEntries int
-	OnEvicted  func(key Key, value interface{})
+	OnEvicted  func(key uint32, value interface{})
 
 	// list 存放 entry 的指针
 	cacheList *list.List
@@ -17,7 +15,7 @@ type Cache struct {
 }
 
 type entry struct {
-	key   Key
+	key   uint32
 	value interface{}
 }
 
@@ -29,7 +27,7 @@ func NewLRU(maxEntries int) (cache *Cache) {
 	}
 }
 
-func (cache *Cache) Add(key Key, value interface{}) {
+func (cache *Cache) Add(key uint32, value interface{}) {
 	if cache.cacheList == nil {
 		cache.cacheList = list.New()
 		cache.cacheMap = make(map[interface{}]*list.Element)
@@ -49,7 +47,7 @@ func (cache *Cache) Add(key Key, value interface{}) {
 	}
 }
 
-func (cache *Cache) Get(key Key) (value interface{}, ok bool) {
+func (cache *Cache) Get(key uint32) (value interface{}, ok bool) {
 	if cache.cacheMap == nil {
 		return
 	}
@@ -72,7 +70,7 @@ func (cache *Cache) removeOldest() {
 	}
 }
 
-func (cache *Cache) Remove(key Key) {
+func (cache *Cache) Remove(key uint32) {
 	if cache.cacheMap == nil {
 		return
 	}
