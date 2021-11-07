@@ -107,7 +107,11 @@ func decodeSlice(r io.Reader, v reflect.Value) (err error) {
 }
 
 func decodeStruct(r io.Reader, v reflect.Value) (err error) {
+	fieldType := v.Type()
 	for i := 0; i < v.Type().NumField(); i++ {
+		if fieldType.Field(i).Tag.Get("encode") == "false" {
+			continue
+		}
 		err = decodeType(r, v.Field(i))
 		if err != nil {
 			return err

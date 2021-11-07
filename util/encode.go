@@ -11,6 +11,9 @@ import (
 )
 
 func encodeType(w io.Writer, v reflect.Value) (err error) {
+	if v.IsZero() {
+		return
+	}
 	// 转换 SQL 数据类型
 	// 0 INT, 1 FLOAT, 2 STRING
 	if v.Kind() == reflect.Interface {
@@ -116,7 +119,11 @@ func encodeMap(w io.Writer, v reflect.Value) (err error) {
 
 func encodeStruct(w io.Writer, v reflect.Value) (err error) {
 	for i := 0; i < v.NumField(); i++ {
-		err = encodeType(w, v.Field(i))
+		field := v.Field(i)
+		if v.Type().Field(i).Tag.Get("encode") == "false" {
+			continue
+		}
+		err = encodeType(w, field)
 		if err != nil {
 			return err
 		}
