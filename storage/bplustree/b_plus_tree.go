@@ -6,61 +6,80 @@ import (
 	"sort"
 )
 
-type DataPage struct {
-	size     uint32
-	DataList [][]ast.SQLExprValue
-}
-
 const order uint32 = 500
 
+const DELETED = ^uint32(0)
+
 var pager = p.GetInstance()
+
+type DataEntry struct {
+	Key  ast.SQLInt
+	Data []ast.SQLExprValue
+}
+
+type DataPage struct {
+	Addr uint32
+
+	Size     uint32
+	DataList []DataEntry
+
+	PreData  uint32
+	NextData uint32
+}
 
 type BPlusTree struct {
 	Root      uint32
 	FirstLeaf uint32
 	LastLeaf  uint32
+
+	FirstData uint32
+	LastData  uint32
 }
 
-func NewTree(_root uint32, _firstLeaf uint32, _lastLeaf uint32) (tree BPlusTree) {
-	tree.Root = _root
-	tree.FirstLeaf = _firstLeaf
-	tree.LastLeaf = _lastLeaf
-	if _root == 0 {
-		rootNode := new(BPlusTreeNode)
-		rootNode.Addr = pager.NewPage(&rootNode)
+func NewTree() (tree BPlusTree) {
+	rootNode := new(BPlusTreeNode)
+	rootNode.Addr = pager.NewPage(rootNode)
+	rootNode.Parent = 0
+	rootNode.PreLeaf = 0
+	rootNode.NextLeaf = 0
+	rootNode.Len = 0
+	rootNode.isLeaf = true
 
-		rootNode.Parent = 0
-		rootNode.PreLeaf = 0
-		rootNode.NextLeaf = 0
-		rootNode.Len = 0
-		rootNode.isLeaf = true
+	dataNode := new(DataPage)
+	dataNode.Addr = pager.NewPage(dataNode)
+	dataNode.Size = 0
+	dataNode.DataList = make([]DataEntry, 0)
+	dataNode.PreData = 0
+	dataNode.NextData = 0
 
-		tree.Root = rootNode.Addr
-		tree.FirstLeaf = rootNode.Addr
-		tree.LastLeaf = rootNode.Addr
-	}
+	tree.Root = rootNode.Addr
+	tree.FirstLeaf = rootNode.Addr
+	tree.LastLeaf = rootNode.Addr
+	tree.FirstData = dataNode.Addr
+	tree.LastData = dataNode.Addr
 	return
 }
 
-func (tree *BPlusTree) getNode(pageNumber uint32) (node *BPlusTreeNode, err error) {
+func getNode(pageNumber uint32) (node *BPlusTreeNode, err error) {
 	page, err := pager.GetPage(pageNumber)
 	node = page.(*BPlusTreeNode)
 	return
 }
 
-func (tree *BPlusTree) searchInTree(key int64) (node *BPlusTreeNode) {
-	node, _ = tree.getNode(tree.Root)
+func (tree *BPlusTree) searchInTree(key int64) (node *BPlusTreeNode, index int) {
+	node, _ = getNode(tree.Root)
+	index = sort.Search(node.Len, func(i int) bool { return node.Keys[i] >= key })
+
 	for !node.isLeaf {
-		index := sort.Search(len(node.Keys), func(i int) bool { return key < node.Keys[i] })
-		node, _ = tree.getNode(node.Values[index])
+		index = sort.Search(node.Len, func(i int) bool { return node.Keys[i] >= key })
+		node, _ = getNode(node.Values[index])
 	}
 	return
 }
 
 func (tree *BPlusTree) Search(key int64) (row []ast.SQLExprValue) {
-	node := tree.searchInTree(key)
-	index := sort.Search(node.Len, func(i int) bool { return key == node.Keys[i] })
-	if index == node.Len {
+	node, index := tree.searchInTree(key)
+	if index == node.Len || node.Keys[index] != key {
 		return nil
 	}
 	pageNumber := node.Values[index]
@@ -70,12 +89,143 @@ func (tree *BPlusTree) Search(key int64) (row []ast.SQLExprValue) {
 	dataPage, _ := pager.GetPage(pageNumber)
 	data := dataPage.(*DataPage)
 
-	dataIndex := sort.Search(len(data.DataList), func(i int) bool { return data.DataList[i][0] == ast.SQLInt(key) })
+	dataIndex := sort.Search(
+		len(data.DataList),
+		func(i int) bool {
+			return data.DataList[i].Key >= ast.SQLInt(key)
+		},
+	)
 
-	if dataIndex >= len(data.DataList) {
+	if dataIndex >= len(data.DataList) ||
+		data.DataList[dataIndex].Key != ast.SQLInt(key) {
 		return nil
 	} else {
-		row = data.DataList[dataIndex]
+		row = data.DataList[dataIndex].Data
 	}
 	return
+}
+
+func (tree *BPlusTree) insertData(row DataEntry) (pageNumber uint32) {
+	page, _ := pager.GetPage(tree.LastData)
+	dataPage := page.(*DataPage)
+	dataPage.DataList = append(dataPage.DataList, row)
+	pageNumber = tree.LastData
+	return
+}
+
+func (tree *BPlusTree) Insert(key int64, row []ast.SQLExprValue) (ok bool) {
+	ok = true
+	node, index := tree.searchInTree(key)
+	if index < node.Len && node.Keys[index] == key {
+		return false
+	}
+	pageNumber := tree.insertData(DataEntry{row[0].(ast.SQLInt), row})
+	ok = node.insertEntry(key, pageNumber)
+	if !ok {
+		return
+	}
+	if node.needSplit() {
+		tree.splitLeaf(node)
+	}
+	return
+}
+
+func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
+	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
+	if node.Addr == tree.Root {
+		newRoot := new(BPlusTreeNode)
+		newRoot.Addr = pager.NewPage(newRoot)
+		newRoot.Parent = 0
+		newRoot.Len = 0
+		newRoot.isLeaf = false
+		newRoot.Values[0] = node.Addr
+
+		node.Parent = newRoot.Addr
+
+		tree.Root = newRoot.Addr
+		tree.FirstLeaf = node.Addr
+		tree.LastLeaf = node.Addr
+	}
+
+	newNode := new(BPlusTreeNode)
+	newNode.Addr = pager.NewPage(newNode)
+	newNode.Parent = node.Parent
+
+	// 复制一半元素
+	for i := order / 2; i < uint32(node.Len); i++ {
+		newNode.Keys[i-order/2] = node.Keys[i]
+		newNode.Values[i-order/2] = node.Values[i]
+	}
+	node.Len = int(order) / 2
+	newNode.Len = int(order) - int(order)/2
+
+	newNode.isLeaf = true
+
+	// 重新设置前后节点关系
+	newNode.PreLeaf = node.Addr
+	newNode.NextLeaf = node.NextLeaf
+
+	// 如果当前节点后面还有节点，还需要更改后一个节点的 preLeaf
+	if node.NextLeaf != 0 {
+		nextNextLeaf, _ := getNode(node.NextLeaf)
+		nextNextLeaf.PreLeaf = newNode.Addr
+	}
+	node.NextLeaf = newNode.Addr
+
+	if node.Addr == tree.LastLeaf {
+		tree.LastLeaf = newNode.Addr
+	}
+
+	// 递归更改父节点
+	parentNode, _ := getNode(node.Parent)
+	parentNode.insertEntry(newNode.Keys[0], newNode.Addr)
+	if parentNode.needSplit() {
+		tree.splitParent(parentNode)
+	}
+}
+
+func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
+	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
+	if node.Addr == tree.Root {
+		newRoot := new(BPlusTreeNode)
+		newRoot.Addr = pager.NewPage(newRoot)
+		newRoot.Parent = 0
+		newRoot.isLeaf = false
+		newRoot.Len = 0
+		newRoot.Values[0] = node.Addr
+
+		node.Parent = newRoot.Addr
+
+		tree.Root = newRoot.Addr
+	}
+
+	newNode := new(BPlusTreeNode)
+	newNode.Addr = pager.NewPage(newNode)
+
+	// 复制一半元素
+	for i := order / 2; i < uint32(node.Len); i++ {
+		newNode.Keys[i-order/2] = node.Keys[i]
+		newNode.Values[i-order/2] = node.Values[i]
+	}
+	// 对于非叶子节点，children 比 keys 多一
+	newNode.Values[node.Len-int(order)/2] = node.Values[node.Len]
+	// node 需要上升一个节点到父节点
+	node.Len = int(order)/2 - 1
+	newNode.Len = int(order) - int(order)/2
+
+	newNode.isLeaf = false
+
+	// 更新新节点的子节点的父节点
+	for i := 0; i < newNode.Len+1; i++ {
+		child, _ := getNode(newNode.Values[i])
+		child.Parent = newNode.Addr
+	}
+
+	k := node.Keys[node.Len]
+	v := newNode.Addr
+	parent, _ := getNode(node.Parent)
+	parent.insertEntry(k, v)
+	if parent.needSplit() {
+		tree.splitParent(parent)
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"minidb-go/parser/ast"
+	"minidb-go/storage/bplustree"
 	"minidb-go/util"
 	"os"
 
@@ -48,6 +49,10 @@ func main() {
 	fmt.Println(buff.Bytes())
 	util.Decode(buff, q)
 	fmt.Println(p, q)
+
+	tree := bplustree.NewTree()
+	tree.Insert(1, []ast.SQLExprValue{ast.SQLInt(1), ast.SQLInt(200)})
+	fmt.Println(tree.Search(1))
 
 	// sql := "delete from student where id = -1.2;"
 	// sqlParser, _ := parser.NewParser(sql)

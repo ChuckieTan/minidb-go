@@ -35,7 +35,7 @@ func (cache *Cache) Add(key uint32, value interface{}) {
 
 	if elementValue, ok := cache.cacheMap[key]; ok {
 		cache.cacheList.MoveToFront(elementValue)
-		elementValue.Value = value
+		elementValue.Value = &entry{key, value}
 		return
 	}
 

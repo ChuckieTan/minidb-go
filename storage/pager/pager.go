@@ -27,10 +27,15 @@ func (pager *Pager) dump(key uint32, value interface{}) {
 }
 
 func (pager *Pager) GetPage(pageNumber uint32) (page interface{}, err error) {
+	page, _ = pager.cache.Get(pageNumber)
 	return
 }
 
+var a uint32 = 1
+
 func (pager *Pager) NewPage(data interface{}) (addr uint32) {
+	addr = a
+	a++
 	pager.cache.Add(addr, data)
 	return
 }
