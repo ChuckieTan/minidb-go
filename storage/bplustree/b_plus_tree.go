@@ -245,8 +245,9 @@ func (tree *BPlusTree) updateData(data DataEntry) (pageNumber uint32, ok bool) {
 		ok = false
 		return
 	}
-	dataPage.DataList[dataIndex] = data
-	pageNumber = tree.LastData
+	// 删除对应的 data
+	dataPage.DataList = append(dataPage.DataList[:dataIndex], dataPage.DataList[dataIndex+1:]...)
+	pageNumber = tree.insertData(data)
 	return
 }
 
