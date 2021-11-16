@@ -1,6 +1,9 @@
 package bplustree
 
-import "sort"
+import (
+	"minidb-go/parser/ast"
+	"sort"
+)
 
 type BPlusTreeNode struct {
 	Addr     uint32
@@ -9,7 +12,7 @@ type BPlusTreeNode struct {
 	NextLeaf uint32
 
 	Len    int
-	Keys   [order]int64
+	Keys   [order]ast.SQLInt
 	Values [order + 1]uint32
 
 	isLeaf bool
@@ -19,7 +22,7 @@ func (node *BPlusTreeNode) needSplit() bool {
 	return node.Len > int(order)-1
 }
 
-func (node *BPlusTreeNode) insertEntry(key int64, value uint32) (ok bool) {
+func (node *BPlusTreeNode) insertEntry(key ast.SQLInt, value uint32) (ok bool) {
 	index := sort.Search(node.Len, func(i int) bool { return node.Keys[i] >= key })
 
 	// 如果已经存在 key

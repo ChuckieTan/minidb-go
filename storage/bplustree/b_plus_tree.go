@@ -66,7 +66,7 @@ func getNode(pageNumber uint32) (node *BPlusTreeNode, err error) {
 	return
 }
 
-func (tree *BPlusTree) searchInTree(key int64) (node *BPlusTreeNode, index int) {
+func (tree *BPlusTree) searchInTree(key ast.SQLInt) (node *BPlusTreeNode, index int) {
 	node, _ = getNode(tree.Root)
 	index = sort.Search(node.Len, func(i int) bool { return node.Keys[i] >= key })
 
@@ -77,7 +77,7 @@ func (tree *BPlusTree) searchInTree(key int64) (node *BPlusTreeNode, index int) 
 	return
 }
 
-func (tree *BPlusTree) Search(key int64) (row []ast.SQLExprValue) {
+func (tree *BPlusTree) Search(key ast.SQLInt) (row []ast.SQLExprValue) {
 	node, index := tree.searchInTree(key)
 	if index == node.Len || node.Keys[index] != key {
 		return nil
@@ -113,14 +113,14 @@ func (tree *BPlusTree) insertData(row DataEntry) (pageNumber uint32) {
 	return
 }
 
-func (tree *BPlusTree) Insert(key int64, row []ast.SQLExprValue) (ok bool) {
+func (tree *BPlusTree) Insert(data DataEntry) (ok bool) {
 	ok = true
-	node, index := tree.searchInTree(key)
-	if index < node.Len && node.Keys[index] == key {
+	node, index := tree.searchInTree(data.Key)
+	if index < node.Len && node.Keys[index] == data.Key {
 		return false
 	}
-	pageNumber := tree.insertData(DataEntry{row[0].(ast.SQLInt), row})
-	ok = node.insertEntry(key, pageNumber)
+	pageNumber := tree.insertData(data)
+	ok = node.insertEntry(data.Key, pageNumber)
 	if !ok {
 		return
 	}
