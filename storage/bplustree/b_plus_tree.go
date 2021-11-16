@@ -86,21 +86,21 @@ func (tree *BPlusTree) Search(key ast.SQLInt) (row []ast.SQLExprValue) {
 	if pageNumber == 0 {
 		return nil
 	}
-	dataPage, _ := pager.GetPage(pageNumber)
-	data := dataPage.(*DataPage)
+	rawPage, _ := pager.GetPage(pageNumber)
+	dataPage := rawPage.(*DataPage)
 
 	dataIndex := sort.Search(
-		len(data.DataList),
+		len(dataPage.DataList),
 		func(i int) bool {
-			return data.DataList[i].Key >= ast.SQLInt(key)
+			return dataPage.DataList[i].Key >= key
 		},
 	)
 
-	if dataIndex >= len(data.DataList) ||
-		data.DataList[dataIndex].Key != ast.SQLInt(key) {
+	if dataIndex >= len(dataPage.DataList) ||
+		dataPage.DataList[dataIndex].Key != key {
 		return nil
 	} else {
-		row = data.DataList[dataIndex].Data
+		row = dataPage.DataList[dataIndex].Data
 	}
 	return
 }
@@ -228,4 +228,35 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 	if parent.needSplit() {
 		tree.splitParent(parent)
 	}
+}
+
+func (tree *BPlusTree) updateData(data DataEntry) (pageNumber uint32, ok bool) {
+	rawPage, _ := pager.GetPage(tree.LastData)
+	dataPage := rawPage.(*DataPage)
+
+	dataIndex := sort.Search(
+		len(dataPage.DataList),
+		func(i int) bool {
+			return dataPage.DataList[i].Key >= data.Key
+		},
+	)
+	if dataIndex >= len(dataPage.DataList) ||
+		dataPage.DataList[dataIndex].Key != data.Key {
+		ok = false
+		return
+	}
+	dataPage.DataList[dataIndex] = data
+	pageNumber = tree.LastData
+	return
+}
+
+func (tree *BPlusTree) Update(data DataEntry) (ok bool) {
+	ok = true
+	node, index := tree.searchInTree(data.Key)
+	if index >= node.Len || node.Keys[index] != data.Key {
+		return false
+	}
+	pageNumber, ok := tree.updateData(data)
+	node.Values[index] = pageNumber
+	return
 }

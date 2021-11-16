@@ -57,7 +57,13 @@ func main() {
 	}
 	tree.Insert(data)
 	fmt.Println(tree.Search(1))
+	data = bplustree.DataEntry{
+		Key:  ast.SQLInt(1),
+		Data: []ast.SQLExprValue{ast.SQLInt(1), ast.SQLInt(300)},
+	}
 
+	tree.Update(data)
+	fmt.Println(tree.Search(1))
 	// sql := "delete from student where id = -1.2;"
 	// sqlParser, _ := parser.NewParser(sql)
 	// statement, _ := sqlParser.ParseDeleteStatement()
