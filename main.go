@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"minidb-go/parser/ast"
+	"minidb-go/storage"
 	"minidb-go/storage/bplustree"
 	"minidb-go/util"
 	"os"
@@ -64,6 +65,17 @@ func main() {
 
 	tree.Update(data)
 	fmt.Println(tree.Search(1))
+
+	meta := storage.GetMetaPage()
+	meta.NewTable("student")
+	meta.InsertData("student", data)
+	fmt.Println(meta.SearchData("student", ast.SQLInt(1)), "storage")
+	data = bplustree.DataEntry{
+		Key:  ast.SQLInt(1),
+		Data: []ast.SQLExprValue{ast.SQLInt(1), ast.SQLInt(400)},
+	}
+	meta.UpdateData("student", data)
+	fmt.Println(meta.SearchData("student", ast.SQLInt(1)), "storage")
 	// sql := "delete from student where id = -1.2;"
 	// sqlParser, _ := parser.NewParser(sql)
 	// statement, _ := sqlParser.ParseDeleteStatement()
