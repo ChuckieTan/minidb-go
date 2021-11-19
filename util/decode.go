@@ -21,6 +21,10 @@ func decodeType(r io.Reader, v reflect.Value) (err error) {
 	case int8:
 		err = binary.Read(r, binary.BigEndian, &value)
 		v.SetInt(int64(value))
+	case int:
+		newValue := int32(0)
+		err = binary.Read(r, binary.BigEndian, &newValue)
+		v.SetInt(int64(newValue))
 	case int32:
 		err = binary.Read(r, binary.BigEndian, &value)
 		v.SetInt(int64(value))
@@ -51,6 +55,8 @@ func decodeType(r io.Reader, v reflect.Value) (err error) {
 			err = decodeArray(r, v)
 		case reflect.Slice:
 			err = decodeSlice(r, v)
+		case reflect.Map:
+			err = decodeMap(r, v)
 		case reflect.Struct:
 			err = decodeStruct(r, v)
 		case reflect.Ptr:
@@ -69,6 +75,29 @@ func decodeType(r io.Reader, v reflect.Value) (err error) {
 			return
 		}
 	}
+	return
+}
+
+func decodeMap(r io.Reader, v reflect.Value) (err error) {
+	var l int32
+	binary.Read(r, binary.BigEndian, &l)
+
+	newMap := reflect.MakeMapWithSize(
+		reflect.MapOf(v.Type().Key(), v.Type().Elem()), int(l))
+	for i := int32(0); i < l; i++ {
+		key := reflect.New(v.Type().Key())
+		err = decodeType(r, key.Elem())
+		if err != nil {
+			return
+		}
+		value := reflect.New(v.Type().Elem())
+		err = decodeType(r, value.Elem())
+		if err != nil {
+			return
+		}
+		newMap.SetMapIndex(key.Elem(), value.Elem())
+	}
+	v.Set(newMap)
 	return
 }
 

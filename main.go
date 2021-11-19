@@ -34,6 +34,7 @@ func main() {
 	type P struct {
 		X, Y int32
 		Arr  []int32
+		Map  map[string]int
 	}
 	// type P struct {
 	// 	X ast.SQLExprValue
@@ -42,7 +43,9 @@ func main() {
 	// p := bplustree.New(1, 2, 3, nil)
 	// p := "123"
 	// var q = bplustree.BPlusTree{}
-	p := P{1, 2, []int32{1, 2, 3, 4, 5}}
+	p := P{1, 2, []int32{1, 2, 3, 4, 5}, make(map[string]int)}
+	p.Map["1"] = 1
+	p.Map["2"] = 2
 	q := new(P)
 	// p := []int32{1, 2, 3, 4, 5}
 	// var q []int32

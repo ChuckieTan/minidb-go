@@ -104,6 +104,7 @@ func encodeSlice(w io.Writer, v reflect.Value) (err error) {
 }
 
 func encodeMap(w io.Writer, v reflect.Value) (err error) {
+	encodeType(w, reflect.ValueOf(v.Len()))
 	for _, key := range v.MapKeys() {
 		err = encodeType(w, key)
 		if err != nil {
