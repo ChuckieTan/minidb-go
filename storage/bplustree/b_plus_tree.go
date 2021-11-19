@@ -27,6 +27,7 @@ type DataPage struct {
 	NextData uint32
 }
 
+// b+树，保存其各个关键节点的页号
 type BPlusTree struct {
 	Root      uint32
 	FirstLeaf uint32
@@ -36,6 +37,7 @@ type BPlusTree struct {
 	LastData  uint32
 }
 
+// 新建一个 b+树
 func NewTree() (tree BPlusTree) {
 	rootNode := new(BPlusTreeNode)
 	rootNode.Addr = pager.NewPage(rootNode)
@@ -60,12 +62,21 @@ func NewTree() (tree BPlusTree) {
 	return
 }
 
+// 获取页号对应的 b+树节点
+// pageNumber: 页号
+// return:
+// 		node: B+树节点
 func getNode(pageNumber uint32) (node *BPlusTreeNode, err error) {
 	page, err := pager.GetPage(pageNumber)
 	node = page.(*BPlusTreeNode)
 	return
 }
 
+// 返回 key 在 B+树中应该在的位置
+// key: 主键
+// return:
+// 		node: key 应该在的 B+树节点
+// 		index: 在节点中的下标
 func (tree *BPlusTree) searchInTree(key ast.SQLInt) (node *BPlusTreeNode, index int) {
 	node, _ = getNode(tree.Root)
 	index = sort.Search(node.Len, func(i int) bool { return node.Keys[i] >= key })

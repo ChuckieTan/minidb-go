@@ -22,6 +22,7 @@ func (node *BPlusTreeNode) needSplit() bool {
 	return node.Len > int(order)-1
 }
 
+// 插入数据，key 为主键， Value 为磁盘页号
 func (node *BPlusTreeNode) insertEntry(key ast.SQLInt, value uint32) (ok bool) {
 	index := sort.Search(node.Len, func(i int) bool { return node.Keys[i] >= key })
 
