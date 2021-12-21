@@ -4,9 +4,9 @@ import (
 	"container/list"
 )
 
-type Cache struct {
+type LRU struct {
 	MaxEntries int
-	OnEvicted  func(key uint32, value interface{})
+	OnEvicted  func(key interface{}, value interface{})
 
 	// list 存放 entry 的指针
 	cacheList *list.List
@@ -15,19 +15,19 @@ type Cache struct {
 }
 
 type entry struct {
-	key   uint32
+	key   interface{}
 	value interface{}
 }
 
-func NewLRU(maxEntries int) (cache *Cache) {
-	return &Cache{
+func NewLRU(maxEntries int) (cache *LRU) {
+	return &LRU{
 		MaxEntries: maxEntries,
 		cacheList:  list.New(),
 		cacheMap:   make(map[interface{}]*list.Element),
 	}
 }
 
-func (cache *Cache) Add(key uint32, value interface{}) {
+func (cache *LRU) Set(key interface{}, value interface{}) {
 	if cache.cacheList == nil {
 		cache.cacheList = list.New()
 		cache.cacheMap = make(map[interface{}]*list.Element)
@@ -47,7 +47,7 @@ func (cache *Cache) Add(key uint32, value interface{}) {
 	}
 }
 
-func (cache *Cache) Get(key uint32) (value interface{}, ok bool) {
+func (cache *LRU) Get(key interface{}) (value interface{}, ok bool) {
 	if cache.cacheMap == nil {
 		return
 	}
@@ -60,7 +60,7 @@ func (cache *Cache) Get(key uint32) (value interface{}, ok bool) {
 	return
 }
 
-func (cache *Cache) removeOldest() {
+func (cache *LRU) removeOldest() {
 	if cache.cacheMap == nil {
 		return
 	}
@@ -70,7 +70,7 @@ func (cache *Cache) removeOldest() {
 	}
 }
 
-func (cache *Cache) Remove(key uint32) {
+func (cache *LRU) Remove(key interface{}) {
 	if cache.cacheMap == nil {
 		return
 	}
@@ -79,7 +79,7 @@ func (cache *Cache) Remove(key uint32) {
 	}
 }
 
-func (cache *Cache) removeElement(element *list.Element) {
+func (cache *LRU) removeElement(element *list.Element) {
 	node := element.Value.(*entry)
 	key, value := node.key, node.value
 	delete(cache.cacheMap, key)
@@ -89,6 +89,10 @@ func (cache *Cache) removeElement(element *list.Element) {
 	cache.cacheList.Remove(element)
 }
 
-func (cache *Cache) Len() int {
+func (cache *LRU) Len() int {
 	return cache.cacheList.Len()
+}
+
+func (cache *LRU) SetEviction(eviction func(key interface{}, value interface{})) {
+	cache.OnEvicted = eviction
 }

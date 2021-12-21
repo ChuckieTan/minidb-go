@@ -1,47 +1,40 @@
 package pager
 
 import (
-	"io"
-	"minidb-go/util/lru"
+	"minidb-go/util"
 )
 
 const PageSize = 16384
 
 type Pager struct {
-	File  io.ReadWriter
-	cache *lru.Cache
+	freeSpace map[util.UUID]uint16 // free space of each page
+	pageCache *PageCache
 }
 
-var p *Pager
-
-// pager 为单例模式，获取唯一的 pager
-func GetInstance() *Pager {
-	if p == nil {
-		p = &Pager{cache: lru.NewLRU(5)}
-		p.cache.OnEvicted = p.dump
+func Create(path string) *Pager {
+	pager := &Pager{
+		freeSpace: make(map[util.UUID]uint16),
+		pageCache: CreatePageCache(path),
 	}
-	return p
+	return pager
 }
 
-// 将页序列化到磁盘上，cache 的回调函数
-func (pager *Pager) dump(key uint32, value interface{}) {
-
+func Open(path string) *Pager {
+	pager := &Pager{
+		freeSpace: make(map[util.UUID]uint16),
+		pageCache: OpenPageCache(path)}
+	return pager
 }
 
-// 返回页号对应的 page
-func (pager *Pager) GetPage(pageNumber uint32) (page interface{}, err error) {
-	page, _ = pager.cache.Get(pageNumber)
-	return
-}
-
-// 磁盘存储暂未实现
-// 虚拟页号，依次递增
-var a uint32 = 1
-
-// 传入一个指针，返回其对应的磁盘页号
-func (pager *Pager) NewPage(data interface{}) (addr uint32) {
-	addr = a
-	a++
-	pager.cache.Add(addr, data)
-	return
+// SelectPage returns the page number which has enough free space.
+func (pager *Pager) Select(spaceSize uint16) (page *Page, ok bool) {
+	for key, value := range pager.freeSpace {
+		if value >= spaceSize {
+			page, ok = pager.pageCache.GetPage(key)
+			ok = true
+			return
+		}
+	}
+	page = pager.pageCache.NewPage()
+	return page, true
 }
