@@ -4,25 +4,26 @@ import (
 	"minidb-go/util"
 )
 
-const PageSize = 16384
+const PageSize = 16384 // 16KB
 
 type Pager struct {
-	freeSpace map[util.UUID]uint16 // free space of each page
-	pageCache *PageCache
+	freeSpaces     map[util.UUID]uint16 // free space of each page
+	availablePages map[util.UUID]bool   // available pages
+	cache          *PageCache
 }
 
 func Create(path string) *Pager {
 	pager := &Pager{
-		freeSpace: make(map[util.UUID]uint16),
-		pageCache: CreatePageCache(path),
+		freeSpaces: make(map[util.UUID]uint16),
+		cache:      CreatePageCache(path),
 	}
 	return pager
 }
 
 func Open(path string) *Pager {
 	pager := &Pager{
-		freeSpace: make(map[util.UUID]uint16),
-		pageCache: OpenPageCache(path)}
+		freeSpaces: make(map[util.UUID]uint16),
+		cache:      OpenPageCache(path)}
 	return pager
 }
 
@@ -41,5 +42,3 @@ func (pager *Pager) Select(spaceSize uint16, owner uint16) (page *DataPage, ok b
 		pageType = DATA_PAGE
 	}
 	page = pager.pageCache.NewPage(owner, pageType)
-	return page, true
-}
