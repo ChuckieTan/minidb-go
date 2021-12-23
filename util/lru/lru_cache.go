@@ -2,6 +2,7 @@ package lru
 
 import (
 	"container/list"
+	"minidb-go/util/cache"
 )
 
 type LRU struct {
@@ -93,6 +94,6 @@ func (cache *LRU) Len() int {
 	return cache.cacheList.Len()
 }
 
-func (cache *LRU) SetEviction(eviction func(key interface{}, value interface{})) {
+func (cache *LRU) SetEviction(eviction cache.Eviction) {
 	cache.OnEvicted = eviction
 }

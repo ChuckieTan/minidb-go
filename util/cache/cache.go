@@ -32,13 +32,13 @@ type Cache interface {
 	// SetCapacity(capacity int)
 
 	// SetEviction sets the eviction function for the cache.
-	// SetEviction(eviction Eviction)
+	SetEviction(eviction Eviction)
 
 	// SetExpiration sets the expiration function for the cache.
 	// SetExpiration(expiration Expiration)
 }
 
-type Eviction func(key string, value []byte)
+type Eviction func(key, value interface{})
 
 // type Expiration func(key string, value []byte) bool
 

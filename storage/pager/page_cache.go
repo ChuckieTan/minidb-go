@@ -19,7 +19,13 @@ func CreatePageCache(path string) *PageCache {
 	if err != nil {
 		log.Fatalf("open file %s failed: %v", path, err)
 	}
-	return newPageCache(lru.NewLRU(16), file)
+	cache := lru.NewLRU(16)
+	pageCache := newPageCache(cache, file)
+	pageCache.cache.SetEviction(func(key, value interface{}) {
+		page := value.(*DataPage)
+		pageCache.Flush(page)
+	})
+	return pageCache
 }
 
 func OpenPageCache(path string) *PageCache {
@@ -27,7 +33,13 @@ func OpenPageCache(path string) *PageCache {
 	if err != nil {
 		log.Fatalf("open file %s failed: %v", path, err)
 	}
-	return newPageCache(lru.NewLRU(16), file)
+	cache := lru.NewLRU(16)
+	pageCache := newPageCache(cache, file)
+	pageCache.cache.SetEviction(func(key, value interface{}) {
+		page := value.(*DataPage)
+		pageCache.Flush(page)
+	})
+	return pageCache
 }
 
 func newPageCache(cache cache.Cache, file *os.File) *PageCache {
@@ -37,13 +49,42 @@ func newPageCache(cache cache.Cache, file *os.File) *PageCache {
 	}
 }
 
-func (pageCache *PageCache) NewPage() *Page {
-	return &Page{}
+func (pageCache *PageCache) NewPage(owner uint16, pageType PageDataType) *DataPage {
+	fileSize, err := pageCache.file.Seek(0, os.SEEK_END)
+	if err != nil {
+		log.Fatalf("seek file failed: %v", err)
+	}
+
+	pageNum := util.UUID(fileSize / PageSize)
+	page := NewPage(pageNum, pageType)
+	pageCache.cache.Set(pageNum, page)
+	pageCache.Flush(page)
+	return page
 }
 
-func (pageCache *PageCache) GetPage(pageNum util.UUID) (*Page, bool) {
+func (pageCache *PageCache) GetPage(pageNum util.UUID) (*DataPage, bool) {
 	if page, ok := pageCache.cache.Get(pageNum); ok {
-		return page.(*Page), true
+		return page.(*DataPage), true
+	} else {
+		data := make([]byte, PageSize)
+		n, err := pageCache.file.ReadAt(data, int64(pageNum)*PageSize)
+		if err != nil || n != PageSize {
+			log.Fatalf("read page %d failed: %v", pageNum, err)
+		}
+		page := LoadPage(pageNum, data)
+		pageCache.cache.Set(pageNum, page)
+		return page, true
 	}
-	return &Page{}, true
+}
+
+func (pageCache *PageCache) Flush(page *DataPage) {
+	n, err := pageCache.file.WriteAt(page.Raw(), int64(uint32(page.pageNum)*PageSize))
+	if err != nil || n != PageSize {
+		log.Fatalf("write page %d failed: %v", page.pageNum, err)
+	}
+	pageCache.file.Sync()
+}
+
+func (pageCache *PageCache) Close() {
+	pageCache.file.Close()
 }

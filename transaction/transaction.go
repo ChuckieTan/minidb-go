@@ -29,28 +29,28 @@ const (
 	XID_FILE_SUFFIX      = ".xid"
 )
 
-type TransactionManager interface {
-	Create()
-	Open()
-	Close()
+// type TransactionManager interface {
+// 	Create()
+// 	Open()
+// 	Close()
 
-	Begin() XID
-	Commit(XID)
-	Abort(XID)
+// 	Begin() XID
+// 	Commit(XID)
+// 	Abort(XID)
 
-	IsActive(XID) bool
-	IsCommit(XID) bool
-	IsAbort(XID) bool
-}
+// 	IsActive(XID) bool
+// 	IsCommit(XID) bool
+// 	IsAbort(XID) bool
+// }
 
 // 事务管理器
-type transactionManager struct {
+type TransactionManager struct {
 	// XID文件
 	file       *os.File
 	xidCounter XID
 }
 
-func Create(path string) (tm *transactionManager) {
+func Create(path string) (tm *TransactionManager) {
 	file, err := os.OpenFile(path+XID_FILE_SUFFIX, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		log.Fatal(err)
@@ -61,7 +61,7 @@ func Create(path string) (tm *transactionManager) {
 	return
 }
 
-func Open(path string) (tm *transactionManager) {
+func Open(path string) (tm *TransactionManager) {
 	file, err := os.OpenFile(path+XID_FILE_SUFFIX, os.O_RDWR, 0600)
 	if err != nil {
 		log.Fatal(err)
@@ -80,7 +80,7 @@ func Open(path string) (tm *transactionManager) {
 	return
 }
 
-func (tm *transactionManager) Close() {
+func (tm *TransactionManager) Close() {
 	tm.file.Close()
 }
 
@@ -89,7 +89,7 @@ func xidPosition(xid XID) (position uint32) {
 	return
 }
 
-func (tm *transactionManager) updateXID(xid XID, status byte) {
+func (tm *TransactionManager) updateXID(xid XID, status byte) {
 	offset := xidPosition(xid)
 	statusBytes := make([]byte, 1)
 	statusBytes[0] = status
@@ -112,7 +112,7 @@ func xidToBytes(xid XID) (slice []byte) {
 	return
 }
 
-func (tm *transactionManager) incXidCounter() {
+func (tm *TransactionManager) incXidCounter() {
 	tm.xidCounter++
 	_, err := tm.file.WriteAt(xidToBytes(tm.xidCounter), 0)
 	if err != nil {
@@ -125,7 +125,7 @@ func (tm *transactionManager) incXidCounter() {
 }
 
 // 开始一个事务，并返回该事务对应的 XID
-func (tm *transactionManager) Begin() (xid XID) {
+func (tm *TransactionManager) Begin() (xid XID) {
 	xid = tm.xidCounter + 1
 	tm.updateXID(xid, TRANS_ACTIVE)
 	tm.incXidCounter()
@@ -133,16 +133,16 @@ func (tm *transactionManager) Begin() (xid XID) {
 }
 
 // 提交一个事务
-func (tm *transactionManager) Commit(xid XID) {
+func (tm *TransactionManager) Commit(xid XID) {
 	tm.updateXID(xid, TRANS_COMMITED)
 }
 
 // 回滚一个事务
-func (tm *transactionManager) Abort(xid XID) {
+func (tm *TransactionManager) Abort(xid XID) {
 	tm.updateXID(xid, TRANS_ABORTED)
 }
 
-func (tm *transactionManager) checkStatus(xid XID, status byte) (res bool) {
+func (tm *TransactionManager) checkStatus(xid XID, status byte) (res bool) {
 	statusBytes := make([]byte, 1)
 	_, err := tm.file.ReadAt(statusBytes, int64(xidPosition(xid)))
 	if err != nil {
@@ -152,17 +152,17 @@ func (tm *transactionManager) checkStatus(xid XID, status byte) (res bool) {
 	return
 }
 
-func (tm *transactionManager) IsActive(xid XID) (res bool) {
+func (tm *TransactionManager) IsActive(xid XID) (res bool) {
 	res = tm.checkStatus(xid, TRANS_ACTIVE)
 	return
 }
 
-func (tm *transactionManager) IsCommit(xid XID) (res bool) {
+func (tm *TransactionManager) IsCommit(xid XID) (res bool) {
 	res = tm.checkStatus(xid, TRANS_COMMITED)
 	return
 }
 
-func (tm *transactionManager) IsAbort(xid XID) (res bool) {
+func (tm *TransactionManager) IsAbort(xid XID) (res bool) {
 	res = tm.checkStatus(xid, TRANS_ABORTED)
 	return
 }
