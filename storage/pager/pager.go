@@ -28,7 +28,7 @@ func Open(path string) *Pager {
 }
 
 // SelectPage returns the page number which has enough free space.
-func (pager *Pager) Select(spaceSize uint16, owner uint16) (page *DataPage, ok bool) {
+func (pager *Pager) Select(spaceSize uint16, owner uint16) (page *Page, ok bool) {
 	for key, value := range pager.freeSpace {
 		if value >= spaceSize {
 			page, ok = pager.pageCache.GetPage(key)

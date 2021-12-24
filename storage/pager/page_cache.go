@@ -22,7 +22,7 @@ func CreatePageCache(path string) *PageCache {
 	cache := lru.NewLRU(16)
 	pageCache := newPageCache(cache, file)
 	pageCache.cache.SetEviction(func(key, value interface{}) {
-		page := value.(*DataPage)
+		page := value.(*Page)
 		pageCache.Flush(page)
 	})
 	return pageCache
@@ -36,7 +36,7 @@ func OpenPageCache(path string) *PageCache {
 	cache := lru.NewLRU(16)
 	pageCache := newPageCache(cache, file)
 	pageCache.cache.SetEviction(func(key, value interface{}) {
-		page := value.(*DataPage)
+		page := value.(*Page)
 		pageCache.Flush(page)
 	})
 	return pageCache
@@ -49,7 +49,7 @@ func newPageCache(cache cache.Cache, file *os.File) *PageCache {
 	}
 }
 
-func (pageCache *PageCache) NewPage(owner uint16, pageType PageDataType) *DataPage {
+func (pageCache *PageCache) NewPage(owner uint16, pageType PageDataType) *Page {
 	fileSize, err := pageCache.file.Seek(0, os.SEEK_END)
 	if err != nil {
 		log.Fatalf("seek file failed: %v", err)
@@ -62,9 +62,9 @@ func (pageCache *PageCache) NewPage(owner uint16, pageType PageDataType) *DataPa
 	return page
 }
 
-func (pageCache *PageCache) GetPage(pageNum util.UUID) (*DataPage, bool) {
+func (pageCache *PageCache) GetPage(pageNum util.UUID) (*Page, bool) {
 	if page, ok := pageCache.cache.Get(pageNum); ok {
-		return page.(*DataPage), true
+		return page.(*Page), true
 	} else {
 		data := make([]byte, PageSize)
 		n, err := pageCache.file.ReadAt(data, int64(pageNum)*PageSize)
@@ -77,7 +77,7 @@ func (pageCache *PageCache) GetPage(pageNum util.UUID) (*DataPage, bool) {
 	}
 }
 
-func (pageCache *PageCache) Flush(page *DataPage) {
+func (pageCache *PageCache) Flush(page *Page) {
 	n, err := pageCache.file.WriteAt(page.Raw(), int64(uint32(page.pageNum)*PageSize))
 	if err != nil || n != PageSize {
 		log.Fatalf("write page %d failed: %v", page.pageNum, err)
