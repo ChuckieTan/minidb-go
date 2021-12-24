@@ -29,16 +29,17 @@ func Open(path string) *Pager {
 
 // SelectPage returns the page number which has enough free space.
 func (pager *Pager) Select(spaceSize uint16, owner uint16) (page *Page, ok bool) {
-	for key, value := range pager.freeSpace {
+	for key, value := range pager.freeSpaces {
 		if value >= spaceSize {
-			page, ok = pager.pageCache.GetPage(key)
+			page, ok = pager.cache.GetPage(key)
 			return
 		}
 	}
-	var pageType PageDataType
+	var pageType PageType
 	if owner == 0 {
 		pageType = META_PAGE
 	} else {
 		pageType = DATA_PAGE
 	}
-	page = pager.pageCache.NewPage(owner, pageType)
+	page = pager.cache.NewPage(owner, pageType)
+}

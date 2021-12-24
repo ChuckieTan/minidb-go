@@ -14,10 +14,10 @@ const (
 	INDEX_DATA
 )
 
-func NewPageData(dataType PageDataType) *PageData {
+func NewPageData(dataType PageDataType) PageData {
 	panic("implement me")
 }
 
-func LoadPageData(r io.Reader) *PageData {
+func LoadPageData(r io.Reader) PageData {
 	panic("implement me")
 }

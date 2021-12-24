@@ -49,14 +49,14 @@ func newPageCache(cache cache.Cache, file *os.File) *PageCache {
 	}
 }
 
-func (pageCache *PageCache) NewPage(owner uint16, pageType PageDataType) *Page {
+func (pageCache *PageCache) NewPage(owner uint16, pageType PageType) *Page {
 	fileSize, err := pageCache.file.Seek(0, os.SEEK_END)
 	if err != nil {
 		log.Fatalf("seek file failed: %v", err)
 	}
 
 	pageNum := util.UUID(fileSize / PageSize)
-	page := NewPage(pageNum, pageType)
+	page := NewPage(pageNum, pageType, owner)
 	pageCache.cache.Set(pageNum, page)
 	pageCache.Flush(page)
 	return page
@@ -66,12 +66,7 @@ func (pageCache *PageCache) GetPage(pageNum util.UUID) (*Page, bool) {
 	if page, ok := pageCache.cache.Get(pageNum); ok {
 		return page.(*Page), true
 	} else {
-		data := make([]byte, PageSize)
-		n, err := pageCache.file.ReadAt(data, int64(pageNum)*PageSize)
-		if err != nil || n != PageSize {
-			log.Fatalf("read page %d failed: %v", pageNum, err)
-		}
-		page := LoadPage(pageNum, data)
+		page := LoadPage(pageCache.file)
 		pageCache.cache.Set(pageNum, page)
 		return page, true
 	}
