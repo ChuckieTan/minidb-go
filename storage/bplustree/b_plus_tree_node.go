@@ -1,7 +1,9 @@
 package bplustree
 
 import (
+	"bytes"
 	"minidb-go/parser/ast"
+	"minidb-go/util"
 	"sort"
 )
 
@@ -52,4 +54,10 @@ func (node *BPlusTreeNode) insertEntry(key ast.SQLInt, value uint32) (ok bool) {
 	}
 	node.Len++
 	return
+}
+
+func (node *BPlusTreeNode) Raw() []byte {
+	buff := bytes.NewBuffer(make([]byte, 1024))
+	util.Encode(buff, node)
+	return buff.Bytes()
 }

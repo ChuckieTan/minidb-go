@@ -55,7 +55,7 @@ func (pageCache *PageCache) NewPage(owner uint16, pageType PageType) *Page {
 		log.Fatalf("seek file failed: %v", err)
 	}
 
-	pageNum := util.UUID(fileSize / PageSize)
+	pageNum := util.UUID(fileSize / util.PageSize)
 	page := NewPage(pageNum, pageType, owner)
 	pageCache.cache.Set(pageNum, page)
 	pageCache.Flush(page)
@@ -73,8 +73,8 @@ func (pageCache *PageCache) GetPage(pageNum util.UUID) (*Page, bool) {
 }
 
 func (pageCache *PageCache) Flush(page *Page) {
-	n, err := pageCache.file.WriteAt(page.Raw(), int64(uint32(page.pageNum)*PageSize))
-	if err != nil || n != PageSize {
+	n, err := pageCache.file.WriteAt(page.Raw(), int64(uint32(page.pageNum)*util.PageSize))
+	if err != nil || n != util.PageSize {
 		log.Fatalf("write page %d failed: %v", page.pageNum, err)
 	}
 	pageCache.file.Sync()

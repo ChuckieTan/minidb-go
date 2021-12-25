@@ -1,6 +1,11 @@
 package pager
 
-import "io"
+import (
+	"bytes"
+	"io"
+	"minidb-go/parser/ast"
+	"minidb-go/util"
+)
 
 type PageData interface {
 	Raw() []byte
@@ -18,6 +23,44 @@ func NewPageData(dataType PageDataType) PageData {
 	panic("implement me")
 }
 
-func LoadPageData(r io.Reader) PageData {
+func LoadPageData(r io.Reader, pageType PageType) PageData {
 	panic("implement me")
+}
+
+type IndexInfo struct {
+	ColumnName   string
+	IndexPageNum util.UUID
+}
+
+type TableInfo struct {
+	tableName     string
+	tableId       uint16
+	ColumnDefines []ast.ColumnDefine
+
+	Indexs []IndexInfo
+}
+
+type MetaData struct {
+	checksum     uint32
+	checksumCopy uint32
+
+	version  string
+	tables   []TableInfo
+	freeList []pageFreeSpace
+}
+
+func (meta *MetaData) Raw() []byte {
+	buff := bytes.NewBuffer(make([]byte, 1024))
+	util.Encode(buff, meta)
+	return buff.Bytes()
+}
+
+type RecordData struct {
+	record [][]ast.SQLExprValue
+}
+
+func (record *RecordData) Raw() []byte {
+	buff := bytes.NewBuffer(make([]byte, 1024))
+	util.Encode(buff, record)
+	return buff.Bytes()
 }

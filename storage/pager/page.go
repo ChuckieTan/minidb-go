@@ -24,7 +24,6 @@ const (
 
 type Page struct {
 	pageNum util.UUID
-	owner   uint16
 
 	nextPageNum util.UUID
 	prevPageNum util.UUID
@@ -59,7 +58,6 @@ func NewPage(pageNum util.UUID,
 
 	return &Page{
 		pageNum: pageNum,
-		owner:   owner,
 
 		nextPageNum: NIL_PAGE_NUM,
 		prevPageNum: NIL_PAGE_NUM,
@@ -74,7 +72,6 @@ func NewPage(pageNum util.UUID,
 }
 
 func LoadPage(r io.Reader) *Page {
-	panic("implement me")
 	page := &Page{}
 	err := util.Decode(r, &page.pageNum)
 	if err != nil {
@@ -84,10 +81,6 @@ func LoadPage(r io.Reader) *Page {
 	if err != nil {
 		log.Fatalf("decode page type failed: %v", err)
 	}
-	err = util.Decode(r, &page.owner)
-	if err != nil {
-		log.Fatalf("decode owner failed: %v", err)
-	}
 	err = util.Decode(r, &page.nextPageNum)
 	if err != nil {
 		log.Fatalf("decode next page num failed: %v", err)
@@ -96,7 +89,7 @@ func LoadPage(r io.Reader) *Page {
 	if err != nil {
 		log.Fatalf("decode prev page num failed: %v", err)
 	}
-	page.data = LoadPageData(r)
+	page.data = LoadPageData(r, page.pageType)
 	page.dataCopy = page.data
 	page.dirty = false
 	return page
@@ -108,11 +101,9 @@ func (p *Page) PageNum() util.UUID {
 
 // 返回 Page 数据的二进制
 func (page *Page) Raw() []byte {
-	panic("implement me")
-	buff := bytes.NewBuffer(make([]byte, PageSize))
+	buff := bytes.NewBuffer(make([]byte, util.PageSize))
 	util.Encode(buff, page.pageNum)
 	util.Encode(buff, page.pageType)
-	util.Encode(buff, page.owner)
 	util.Encode(buff, page.nextPageNum)
 	util.Encode(buff, page.prevPageNum)
 	buff.Write(page.data.Raw())
