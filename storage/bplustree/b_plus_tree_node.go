@@ -2,22 +2,28 @@ package bplustree
 
 import (
 	"bytes"
-	"minidb-go/parser/ast"
 	"minidb-go/util"
 	"sort"
 )
 
+type KeyType [util.BPLUSTREE_KEY_LEN]byte
+type ValueType int64
+
 type BPlusTreeNode struct {
-	Addr     uint32
-	Parent   uint32
-	PreLeaf  uint32
-	NextLeaf uint32
+	Addr     util.UUID
+	Parent   util.UUID
+	PreLeaf  util.UUID
+	NextLeaf util.UUID
 
 	Len    int
-	Keys   [order]ast.SQLInt
-	Values [order + 1]uint32
+	Keys   [order]KeyType
+	Values [order + 1]ValueType
 
 	isLeaf bool
+}
+
+func compare(a, b KeyType) int {
+	return bytes.Compare(a[:], b[:])
 }
 
 func (node *BPlusTreeNode) needSplit() bool {
@@ -25,20 +31,21 @@ func (node *BPlusTreeNode) needSplit() bool {
 }
 
 // 插入数据，key 为主键， Value 为磁盘页号
-func (node *BPlusTreeNode) insertEntry(key ast.SQLInt, value uint32) (ok bool) {
-	index := sort.Search(node.Len, func(i int) bool { return node.Keys[i] >= key })
+func (node *BPlusTreeNode) insertEntry(key KeyType, value ValueType) (ok bool) {
+	index := sort.Search(node.Len, func(i int) bool { return compare(node.Keys[i], key) >= 0 })
 
-	// 如果已经存在 key
-	if index < node.Len && node.Keys[index] == key {
-		// 被标记删除
-		if node.Values[index] == DELETED {
-			node.Values[index] = value
-			return
-		} else {
-			// 否则插入失败
-			return false
-		}
-	}
+	// 可以插入重复的数据
+	// // 如果已经存在 key
+	// if index < node.Len && node.Keys[index] == key {
+	// 	// 被标记删除
+	// 	if node.Values[index] == DELETED {
+	// 		node.Values[index] = value
+	// 		return
+	// 	} else {
+	// 		// 否则插入失败
+	// 		return false
+	// 	}
+	// }
 
 	// 插入 key
 	copy(node.Keys[index+1:], node.Keys[index:order-1])

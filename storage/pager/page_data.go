@@ -27,17 +27,15 @@ func LoadPageData(r io.Reader, pageType PageType) PageData {
 	panic("implement me")
 }
 
-type IndexInfo struct {
-	ColumnName   string
-	IndexPageNum util.UUID
-}
-
 type TableInfo struct {
 	tableName     string
 	tableId       uint16
 	ColumnDefines []ast.ColumnDefine
 
 	Indexs []IndexInfo
+
+	firstPageNum util.UUID
+	lastPageNum  util.UUID
 }
 
 type MetaData struct {

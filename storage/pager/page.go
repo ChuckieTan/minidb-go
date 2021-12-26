@@ -52,7 +52,7 @@ func NewPage(pageNum util.UUID,
 	case INDEX_PAGE:
 		pageDataType = INDEX_DATA
 	default:
-		panic("page data type is not supported")
+		log.Fatalf("invalid page type: %v", pageType)
 	}
 	pageData = NewPageData(pageDataType)
 

@@ -16,8 +16,21 @@ const (
 	// MAX_PAGE_NUM is the maximum value of PageNum.
 	MAX_PAGE_NUM = MAX_UUID
 
-	// MAX_OWNER is the maximum value of Owner.
-	MAX_OWNER = uint16(1)
+	// MAX_TABLE_NUM is the maximum value of TableNum.
+	MAX_TABLE_NUM = 1<<8 - 1
+
+	// MAX_INDEX_NUM is the maximum value of IndexNum.
+	MAX_INDEX_NUM = 1<<8 - 1
+
+	// MAX_COLUMN_NUM is the maximum value of ColumnNum.
+	MAX_COLUMN_NUM = 1<<8 - 1
+
+	// MAX_COLUMN_NAME_LEN is the maximum value of ColumnNameLen.
+	MAX_COLUMN_NAME_LEN = 1<<8 - 1
+
+	// BPLUSTREE_ORDER is the order of B+Tree.
+
+	BPLUSTREE_KEY_LEN = 32
 
 	VERSION = "0.0.1"
 )

@@ -3,12 +3,13 @@ package bplustree
 import (
 	"minidb-go/parser/ast"
 	p "minidb-go/storage/pager"
+	"minidb-go/util"
 	"sort"
 )
 
-const order uint32 = 500
+const order = 500
 
-const DELETED = ^uint32(0)
+const DELETED = 1<<32 - 1
 
 var pager = p.GetInstance()
 
@@ -17,24 +18,32 @@ type DataEntry struct {
 	Data []ast.SQLExprValue
 }
 
-type DataPage struct {
-	Addr uint32
+// 索引信息
+type IndexInfo struct {
+	ColumnId  uint16
+	BPlusTree *BPlusTree
+}
 
-	Size     uint32
+type DataPage struct {
+	Addr util.UUID
+
+	Size     util.UUID
 	DataList []DataEntry
 
-	PreData  uint32
-	NextData uint32
+	PreData  util.UUID
+	NextData util.UUID
 }
 
 // b+树，保存其各个关键节点的页号
 type BPlusTree struct {
-	Root      uint32
-	FirstLeaf uint32
-	LastLeaf  uint32
+	Root      util.UUID
+	FirstLeaf util.UUID
+	LastLeaf  util.UUID
 
-	FirstData uint32
-	LastData  uint32
+	FirstData util.UUID
+	LastData  util.UUID
+
+	Order uint16
 }
 
 // 新建一个 b+树
@@ -66,7 +75,7 @@ func NewTree() (tree BPlusTree) {
 // pageNumber: 页号
 // return:
 // 		node: B+树节点
-func getNode(pageNumber uint32) (node *BPlusTreeNode, err error) {
+func getNode(pageNumber util.UUID) (node *BPlusTreeNode, err error) {
 	page, err := pager.GetPage(pageNumber)
 	node = page.(*BPlusTreeNode)
 	return
@@ -77,18 +86,18 @@ func getNode(pageNumber uint32) (node *BPlusTreeNode, err error) {
 // return:
 // 		node: key 应该在的 B+树节点
 // 		index: 在节点中的下标
-func (tree *BPlusTree) searchInTree(key ast.SQLInt) (node *BPlusTreeNode, index int) {
+func (tree *BPlusTree) searchInTree(key KeyType) (node *BPlusTreeNode, indexs []int) {
 	node, _ = getNode(tree.Root)
-	index = sort.Search(node.Len, func(i int) bool { return node.Keys[i] >= key })
+	index = sort.Search(node.Len, func(i int) bool { return compare(node.Keys[i], key) >= 0 })
 
 	for !node.isLeaf {
-		index = sort.Search(node.Len, func(i int) bool { return node.Keys[i] >= key })
+		index = sort.Search(node.Len, func(i int) bool { return compare(node.Keys[i], key) >= 0 })
 		node, _ = getNode(node.Values[index])
 	}
 	return
 }
 
-func (tree *BPlusTree) Search(key ast.SQLInt) (row []ast.SQLExprValue) {
+func (tree *BPlusTree) Search(key KeyType) (row []ast.SQLExprValue) {
 	node, index := tree.searchInTree(key)
 	if index == node.Len || node.Keys[index] != key {
 		return nil
@@ -116,7 +125,7 @@ func (tree *BPlusTree) Search(key ast.SQLInt) (row []ast.SQLExprValue) {
 	return
 }
 
-func (tree *BPlusTree) insertData(row DataEntry) (pageNumber uint32) {
+func (tree *BPlusTree) insertData(row DataEntry) (pageNumber util.UUID) {
 	page, _ := pager.GetPage(tree.LastData)
 	dataPage := page.(*DataPage)
 	dataPage.DataList = append(dataPage.DataList, row)
@@ -163,7 +172,7 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 	newNode.Parent = node.Parent
 
 	// 复制一半元素
-	for i := order / 2; i < uint32(node.Len); i++ {
+	for i := order / 2; i < node.Len; i++ {
 		newNode.Keys[i-order/2] = node.Keys[i]
 		newNode.Values[i-order/2] = node.Values[i]
 	}
@@ -214,7 +223,7 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 	newNode.Addr = pager.NewPage(newNode)
 
 	// 复制一半元素
-	for i := order / 2; i < uint32(node.Len); i++ {
+	for i := order / 2; i < node.Len; i++ {
 		newNode.Keys[i-order/2] = node.Keys[i]
 		newNode.Values[i-order/2] = node.Values[i]
 	}
@@ -241,7 +250,7 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 	}
 }
 
-func (tree *BPlusTree) updateData(data DataEntry) (pageNumber uint32, ok bool) {
+func (tree *BPlusTree) updateData(data DataEntry) (pageNumber util.UUID, ok bool) {
 	rawPage, _ := pager.GetPage(tree.LastData)
 	dataPage := rawPage.(*DataPage)
 
