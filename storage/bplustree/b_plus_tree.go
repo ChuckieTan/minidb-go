@@ -5,13 +5,14 @@ import (
 	p "minidb-go/storage/pager"
 	"minidb-go/util"
 	"sort"
+
+	log "github.com/sirupsen/logrus"
 )
 
-const order = 500
+type KeyType []byte
 
-const DELETED = 1<<32 - 1
-
-var pager = p.GetInstance()
+// Value 的数据类型， 不能小于 32 位 (4 byte)
+type ValueType []byte
 
 type DataEntry struct {
 	Key  ast.SQLInt
@@ -25,13 +26,8 @@ type IndexInfo struct {
 }
 
 type DataPage struct {
-	Addr util.UUID
-
 	Size     util.UUID
 	DataList []DataEntry
-
-	PreData  util.UUID
-	NextData util.UUID
 }
 
 // b+树，保存其各个关键节点的页号
@@ -40,74 +36,88 @@ type BPlusTree struct {
 	FirstLeaf util.UUID
 	LastLeaf  util.UUID
 
-	FirstData util.UUID
-	LastData  util.UUID
+	Order     uint16
+	KeySize   uint8
+	ValueSize uint8
 
-	Order uint16
+	pager *p.Pager
 }
 
 // 新建一个 b+树
-func NewTree() (tree BPlusTree) {
-	rootNode := new(BPlusTreeNode)
-	rootNode.Addr = pager.NewPage(rootNode)
+func NewTree(pager *p.Pager, KeySize uint8, ValueSize uint8) (tree BPlusTree) {
+	order := uint16((util.PageSize - 1024) / uint16(KeySize+ValueSize))
+
+	rootNode := newNode(order)
+	rootPage := pager.NewPage(rootNode, 0)
+	rootNode.Addr = rootPage.PageNum()
 	rootNode.Parent = 0
 	rootNode.PreLeaf = 0
 	rootNode.NextLeaf = 0
 	rootNode.Len = 0
 	rootNode.isLeaf = true
 
-	dataNode := new(DataPage)
-	dataNode.Addr = pager.NewPage(dataNode)
-	dataNode.Size = 0
-	dataNode.DataList = make([]DataEntry, 0)
-	dataNode.PreData = 0
-	dataNode.NextData = 0
-
 	tree.Root = rootNode.Addr
 	tree.FirstLeaf = rootNode.Addr
 	tree.LastLeaf = rootNode.Addr
-	tree.FirstData = dataNode.Addr
-	tree.LastData = dataNode.Addr
+	tree.Order = order
+	tree.KeySize = KeySize
+	tree.ValueSize = ValueSize
+
+	rootNode.Keys = make([]KeyType, order)
+	rootNode.Values = make([]ValueType, order+1)
 	return
+}
+
+func bytesToUUID(bytes []byte) util.UUID {
+	if len(bytes) != 4 {
+		return 0
+	}
+	return util.UUID(util.BytesToUInt32(bytes))
 }
 
 // 获取页号对应的 b+树节点
 // pageNumber: 页号
 // return:
 // 		node: B+树节点
-func getNode(pageNumber util.UUID) (node *BPlusTreeNode, err error) {
-	page, err := pager.GetPage(pageNumber)
-	node = page.(*BPlusTreeNode)
+func (tree *BPlusTree) getNode(pageNum util.UUID) (node *BPlusTreeNode, err error) {
+	page, err := tree.pager.GetPage(pageNum)
+	node = (*page.Data()).(*BPlusTreeNode)
 	return
 }
 
-// 返回 key 在 B+树中应该在的位置
+// 返回 key 在 B+树中应该在的第一个位置
 // key: 主键
 // return:
 // 		node: key 应该在的 B+树节点
 // 		index: 在节点中的下标
-func (tree *BPlusTree) searchInTree(key KeyType) (node *BPlusTreeNode, indexs []int) {
-	node, _ = getNode(tree.Root)
-	index = sort.Search(node.Len, func(i int) bool { return compare(node.Keys[i], key) >= 0 })
+func (tree *BPlusTree) searchInTree(key KeyType) (node *BPlusTreeNode, index int) {
+	node, err := tree.getNode(tree.Root)
+	if err != nil {
+		log.Fatalf("tree root page load error: %v", err)
+	}
+	index = sort.Search(int(node.Len), func(i int) bool { return compare(node.Keys[i], key) >= 0 })
 
 	for !node.isLeaf {
-		index = sort.Search(node.Len, func(i int) bool { return compare(node.Keys[i], key) >= 0 })
-		node, _ = getNode(node.Values[index])
+		index = sort.Search(int(node.Len), func(i int) bool { return compare(node.Keys[i], key) >= 0 })
+		node, err = tree.getNode(bytesToUUID(node.Values[index]))
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	return
 }
 
-func (tree *BPlusTree) Search(key KeyType) (row []ast.SQLExprValue) {
+func (tree *BPlusTree) Search(key KeyType) (values []ValueType) {
 	node, index := tree.searchInTree(key)
-	if index == node.Len || node.Keys[index] != key {
+	if uint16(index) == node.Len || compare(node.Keys[index], key) != 0 {
 		return nil
 	}
-	pageNumber := node.Values[index]
-	if pageNumber == 0 {
+	pageNum := bytesToUUID(node.Values[index])
+	if pageNum == 0 {
 		return nil
 	}
-	rawPage, _ := pager.GetPage(pageNumber)
-	dataPage := rawPage.(*DataPage)
+	rawPage, _ := tree.pager.GetPage(pageNum)
+	dataPage := rawPage.Data().(*p.RecordData)
 
 	dataIndex := sort.Search(
 		len(dataPage.DataList),
@@ -153,7 +163,7 @@ func (tree *BPlusTree) Insert(data DataEntry) (ok bool) {
 func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
 	if node.Addr == tree.Root {
-		newRoot := new(BPlusTreeNode)
+		newRoot := newNode(tree.Order)
 		newRoot.Addr = pager.NewPage(newRoot)
 		newRoot.Parent = 0
 		newRoot.Len = 0
@@ -167,7 +177,7 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 		tree.LastLeaf = node.Addr
 	}
 
-	newNode := new(BPlusTreeNode)
+	newNode := newNode(tree.Order)
 	newNode.Addr = pager.NewPage(newNode)
 	newNode.Parent = node.Parent
 
@@ -207,7 +217,7 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
 	if node.Addr == tree.Root {
-		newRoot := new(BPlusTreeNode)
+		newRoot := newNode(tree.Order)
 		newRoot.Addr = pager.NewPage(newRoot)
 		newRoot.Parent = 0
 		newRoot.isLeaf = false
@@ -219,19 +229,20 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 		tree.Root = newRoot.Addr
 	}
 
-	newNode := new(BPlusTreeNode)
+	newNode := newNode(tree.Order)
 	newNode.Addr = pager.NewPage(newNode)
 
 	// 复制一半元素
+	order := tree.Order
 	for i := order / 2; i < node.Len; i++ {
 		newNode.Keys[i-order/2] = node.Keys[i]
 		newNode.Values[i-order/2] = node.Values[i]
 	}
 	// 对于非叶子节点，children 比 keys 多一
-	newNode.Values[node.Len-int(order)/2] = node.Values[node.Len]
+	newNode.Values[node.Len-order/2] = node.Values[node.Len]
 	// node 需要上升一个节点到父节点
-	node.Len = int(order)/2 - 1
-	newNode.Len = int(order) - int(order)/2
+	node.Len = order/2 - 1
+	newNode.Len = order - order/2
 
 	newNode.isLeaf = false
 

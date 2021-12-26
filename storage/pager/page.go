@@ -38,31 +38,15 @@ type Page struct {
 	rwlock sync.RWMutex
 }
 
-func NewPage(pageNum util.UUID,
-	pageType PageType,
+func newPage(pageNum util.UUID,
+	pageData PageData,
 	owner uint16) *Page {
-
-	var pageData PageData
-	var pageDataType PageDataType
-	switch pageType {
-	case META_PAGE:
-		pageDataType = META_DATA
-	case DATA_PAGE:
-		pageDataType = RECORE_DATA
-	case INDEX_PAGE:
-		pageDataType = INDEX_DATA
-	default:
-		log.Fatalf("invalid page type: %v", pageType)
-	}
-	pageData = NewPageData(pageDataType)
 
 	return &Page{
 		pageNum: pageNum,
 
 		nextPageNum: NIL_PAGE_NUM,
 		prevPageNum: NIL_PAGE_NUM,
-
-		pageType: pageType,
 
 		data:     pageData,
 		dataCopy: pageData,
@@ -71,28 +55,32 @@ func NewPage(pageNum util.UUID,
 	}
 }
 
-func LoadPage(r io.Reader) *Page {
+func LoadPage(r io.Reader) (*Page, error) {
 	page := &Page{}
 	err := util.Decode(r, &page.pageNum)
 	if err != nil {
-		log.Fatalf("decode page num failed: %v", err)
+		log.Errorf("decode page num failed: %v", err)
+		return nil, err
 	}
 	err = util.Decode(r, &page.pageType)
 	if err != nil {
-		log.Fatalf("decode page type failed: %v", err)
+		log.Errorf("decode page type failed: %v", err)
+		return nil, err
 	}
 	err = util.Decode(r, &page.nextPageNum)
 	if err != nil {
-		log.Fatalf("decode next page num failed: %v", err)
+		log.Errorf("decode next page num failed: %v", err)
+		return nil, err
 	}
 	err = util.Decode(r, &page.prevPageNum)
 	if err != nil {
-		log.Fatalf("decode prev page num failed: %v", err)
+		log.Errorf("decode prev page num failed: %v", err)
+		return nil, err
 	}
 	page.data = LoadPageData(r, page.pageType)
 	page.dataCopy = page.data
 	page.dirty = false
-	return page
+	return page, nil
 }
 
 func (p *Page) PageNum() util.UUID {
@@ -158,4 +146,8 @@ func (p *Page) BeforeWrite() (XID transaction.XID) {
 
 func (p *Page) AfterWrite() {
 	p.rwlock.Unlock()
+}
+
+func (p *Page) Size() int {
+	return 4 + 4 + 4 + 1 + p.data.Size() + 1
 }

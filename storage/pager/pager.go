@@ -1,54 +1,66 @@
 package pager
 
 import (
+	"io"
 	"math/rand"
 	"minidb-go/util"
+	"minidb-go/util/cache"
+	"minidb-go/util/lru"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 )
 
-type pageFreeSpace struct {
-	pageNum util.UUID
-	size    uint16
-}
-
 type Pager struct {
-	availablePages *[]pageFreeSpace // available pages for each owner
-	cache          *PageCache
+	cache cache.Cache
+	file  *os.File
 }
 
 func Create(path string) *Pager {
-	pager := &Pager{
-		availablePages: nil,
-		cache:          CreatePageCache(path),
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		log.Fatalf("open file %s failed: %v", path, err)
 	}
-	metaPage := pager.cache.NewPage(0, META_PAGE)
+	pager := &Pager{
+		file: file,
+	}
 
+	pager.cache = lru.NewLRU(16)
+	pager.cache.SetEviction(func(key, value interface{}) {
+		page := value.(*Page)
+		pager.Flush(page)
+	})
 	// 初始化 meta page
-	metaData := metaPage.data.(*MetaData)
+	metaData := NewMetaData()
 	metaData.checksum = rand.Uint32()
 	metaData.checksumCopy = 0
 	metaData.version = util.VERSION
 	metaData.tables = make([]TableInfo, 0)
-	metaData.freeList = make([]pageFreeSpace, 0)
-	metaData.freeList = append(metaData.freeList, pageFreeSpace{0, util.PageSize})
 
-	// pager 的 availablePages 绑定 meta page
-	pager.availablePages = &metaData.freeList
+	metaPage := pager.NewPage(metaData, 0)
 
-	pager.cache.Flush(metaPage)
+	pager.Flush(metaPage)
 	return pager
 }
 
 func Open(path string) *Pager {
+	file, err := os.OpenFile(path, os.O_RDWR, 0666)
+	if err != nil {
+		log.Fatalf("open file %s failed: %v", path, err)
+	}
 	pager := &Pager{
-		availablePages: nil,
-		cache:          OpenPageCache(path),
+		file: file,
 	}
 
-	metaPage, ok := pager.cache.GetPage(0)
-	if !ok {
-		log.Fatalf("meta page not found")
+	pager.cache = lru.NewLRU(16)
+	pager.cache.SetEviction(func(key, value interface{}) {
+		page := value.(*Page)
+		pager.Flush(page)
+	})
+
+	metaPage, err := pager.GetPage(0)
+	if err != nil {
+		log.Fatalf("get meta page failed: %v", err)
 	}
 	metaData := metaPage.data.(*MetaData)
 	if metaData.version != util.VERSION {
@@ -59,35 +71,72 @@ func Open(path string) *Pager {
 		log.Fatalf("checksum not match")
 	}
 
-	// pager 的 availablePages 绑定 meta page
-	pager.availablePages = &metaData.freeList
-
 	return pager
 }
 
-// SelectPage returns the page number which has enough free space.
+// 选择一个具有可用空间的 page
 func (pager *Pager) Select(spaceSize uint16, owner uint16) (page *Page, ok bool) {
 	if spaceSize > util.PageSize {
 		return nil, false
 	}
 
-	if (*pager.availablePages)[owner].size >= spaceSize {
-		pageNum := (*pager.availablePages)[owner].pageNum
-		page, ok = pager.cache.GetPage(pageNum)
-		if !ok {
-			return nil, false
-		}
-		(*pager.availablePages)[owner].size -= spaceSize
+	metaPage, err := pager.GetPage(0)
+	if err != nil {
+		log.Fatalf("get meta page failed: %v", err)
+	}
+	metaData := metaPage.data.(*MetaData)
+
+	table := metaData.tables[owner-1]
+	page, err = pager.GetPage(table.lastPageNum)
+	if err != nil {
+		log.Fatalf("meta page error, table '%v' last data page not found", table.tableName)
+	}
+
+	if uint16(page.Size()) >= spaceSize {
 		return page, true
 	}
-	var pageType PageType
-	if owner == 0 {
-		pageType = META_PAGE
-	} else {
-		pageType = DATA_PAGE
-	}
-	page = pager.cache.NewPage(owner, pageType)
-	(*pager.availablePages)[owner].pageNum = page.pageNum
-	(*pager.availablePages)[owner].size = util.PageSize - spaceSize
+
+	page = pager.NewPage(NewRecordData(), owner)
+	metaData.tables[owner-1].lastPageNum = page.pageNum
 	return page, true
+}
+
+func (pager *Pager) NewPage(pageData PageData, owner uint16) *Page {
+	fileSize, err := pager.file.Seek(0, os.SEEK_END)
+	if err != nil {
+		log.Fatalf("seek file failed: %v", err)
+	}
+
+	pageNum := util.UUID(fileSize / util.PageSize)
+	page := newPage(pageNum, pageData, owner)
+	pager.cache.Set(pageNum, page)
+	pager.Flush(page)
+	return page
+}
+
+func (pager *Pager) GetPage(pageNum util.UUID) (*Page, error) {
+	if page, ok := pager.cache.Get(pageNum); ok {
+		return page.(*Page), nil
+	} else {
+		pager.file.Seek(0, io.SeekEnd)
+		page, err := LoadPage(pager.file)
+		if err != nil {
+			log.Errorf("load page failed: %v", err)
+			return nil, err
+		}
+		pager.cache.Set(pageNum, page)
+		return page, nil
+	}
+}
+
+func (pager *Pager) Flush(page *Page) {
+	n, err := pager.file.WriteAt(page.Raw(), int64(uint32(page.pageNum)*util.PageSize))
+	if err != nil || n != util.PageSize {
+		log.Fatalf("write page %d failed: %v", page.pageNum, err)
+	}
+	pager.file.Sync()
+}
+
+func (pager *Pager) Close() {
+	pager.file.Close()
 }
