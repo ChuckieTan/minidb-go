@@ -115,7 +115,7 @@ func (pager *Pager) NewPage(pageData PageData, owner uint16) *Page {
 }
 
 func (pager *Pager) GetPage(pageNum util.UUID) (*Page, error) {
-	if page, ok := pager.cache.Get(pageNum); ok {
+	if page, hit := pager.cache.Get(pageNum); hit {
 		return page.(*Page), nil
 	} else {
 		pager.file.Seek(0, io.SeekEnd)

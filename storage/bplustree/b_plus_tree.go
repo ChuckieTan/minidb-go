@@ -1,7 +1,7 @@
 package bplustree
 
 import (
-	"minidb-go/parser/ast"
+	"bytes"
 	p "minidb-go/storage/pager"
 	"minidb-go/util"
 	"sort"
@@ -13,22 +13,6 @@ type KeyType []byte
 
 // Value 的数据类型， 不能小于 32 位 (4 byte)
 type ValueType []byte
-
-type DataEntry struct {
-	Key  ast.SQLInt
-	Data []ast.SQLExprValue
-}
-
-// 索引信息
-type IndexInfo struct {
-	ColumnId  uint16
-	BPlusTree *BPlusTree
-}
-
-type DataPage struct {
-	Size     util.UUID
-	DataList []DataEntry
-}
 
 // b+树，保存其各个关键节点的页号
 type BPlusTree struct {
@@ -90,67 +74,94 @@ func (tree *BPlusTree) getNode(pageNum util.UUID) (node *BPlusTreeNode, err erro
 // return:
 // 		node: key 应该在的 B+树节点
 // 		index: 在节点中的下标
-func (tree *BPlusTree) searchInTree(key KeyType) (node *BPlusTreeNode, index int) {
+func (tree *BPlusTree) searchInTree(key KeyType) (*BPlusTreeNode, uint16) {
 	node, err := tree.getNode(tree.Root)
 	if err != nil {
 		log.Fatalf("tree root page load error: %v", err)
 	}
-	index = sort.Search(int(node.Len), func(i int) bool { return compare(node.Keys[i], key) >= 0 })
+	index := sort.Search(
+		int(node.Len),
+		func(i int) bool { return compare(node.Keys[i], key) >= 0 },
+	)
 
 	for !node.isLeaf {
-		index = sort.Search(int(node.Len), func(i int) bool { return compare(node.Keys[i], key) >= 0 })
+		index = sort.Search(
+			int(node.Len),
+			func(i int) bool { return compare(node.Keys[i], key) >= 0 },
+		)
 		node, err = tree.getNode(bytesToUUID(node.Values[index]))
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
-	return
+	return node, uint16(index)
 }
 
-func (tree *BPlusTree) Search(key KeyType) (values []ValueType) {
+func (tree *BPlusTree) Search(key KeyType) <-chan ValueType {
+	valueChan := make(chan ValueType)
+
 	node, index := tree.searchInTree(key)
 	if uint16(index) == node.Len || compare(node.Keys[index], key) != 0 {
-		return nil
+		close(valueChan)
+		return valueChan
 	}
 	pageNum := bytesToUUID(node.Values[index])
 	if pageNum == 0 {
-		return nil
+		close(valueChan)
+		return valueChan
 	}
-	rawPage, _ := tree.pager.GetPage(pageNum)
-	dataPage := rawPage.Data().(*p.RecordData)
 
-	dataIndex := sort.Search(
-		len(dataPage.DataList),
-		func(i int) bool {
-			return dataPage.DataList[i].Key >= key
-		},
-	)
-
-	if dataIndex >= len(dataPage.DataList) ||
-		dataPage.DataList[dataIndex].Key != key {
-		return nil
-	} else {
-		row = dataPage.DataList[dataIndex].Data
-	}
-	return
+	// 往 ValueChan 中放入数据
+	go func() {
+		nodePage, err := tree.pager.GetPage(pageNum)
+		if err != nil {
+			log.Fatal(err)
+		}
+		leafNode := (*nodePage.Data()).(*BPlusTreeNode)
+		for {
+			currentIndex := index
+			// 先往管道中放入一个 Value，用于去重
+			// 如果下一个 Value 和当前 Value 相同，则不放入管道
+			preValue := leafNode.Values[currentIndex]
+			valueChan <- preValue
+			currentIndex++
+			for currentIndex < node.Len && compare(leafNode.Keys[currentIndex-1], key) == 0 {
+				currentValue := leafNode.Values[currentIndex]
+				if bytes.Compare(preValue[:], currentValue) != 0 {
+					valueChan <- currentValue
+					preValue = currentValue
+				}
+				currentIndex++
+			}
+			// 如果循环到当前 node 的最后一个 Value，则尝试获取下一个 node
+			if currentIndex == node.Len {
+				// 如果当前 node 是最后一个 node，则退出循环
+				if leafNode.NextLeaf == 0 {
+					break
+				}
+				nodePage, err = tree.pager.GetPage(leafNode.NextLeaf)
+				if err != nil {
+					log.Fatal(err)
+				}
+				leafNode = (*nodePage.Data()).(*BPlusTreeNode)
+				currentIndex = 0
+			} else {
+				break
+			}
+		}
+		close(valueChan)
+	}()
+	return valueChan
 }
 
-func (tree *BPlusTree) insertData(row DataEntry) (pageNumber util.UUID) {
-	page, _ := pager.GetPage(tree.LastData)
-	dataPage := page.(*DataPage)
-	dataPage.DataList = append(dataPage.DataList, row)
-	pageNumber = tree.LastData
-	return
-}
-
-func (tree *BPlusTree) Insert(data DataEntry) (ok bool) {
+func (tree *BPlusTree) Insert(key KeyType, value ValueType) (ok bool) {
 	ok = true
-	node, index := tree.searchInTree(data.Key)
-	if index < node.Len && node.Keys[index] == data.Key {
+	node, index := tree.searchInTree(key)
+	if index < node.Len && compare(node.Keys[index], key) == 0 {
 		return false
 	}
-	pageNumber := tree.insertData(data)
-	ok = node.insertEntry(data.Key, pageNumber)
+	// TODO: 新插入的 value 需要放在最后一个位置
+	ok = node.insertEntry(key, value)
 	if !ok {
 		return
 	}

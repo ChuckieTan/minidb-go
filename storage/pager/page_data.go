@@ -26,6 +26,13 @@ func LoadPageData(r io.Reader, pageType PageType) PageData {
 	panic("implement me")
 }
 
+// 应该放入 TableManage 里面
+// 索引信息
+// type IndexInfo struct {
+// 	ColumnId  uint16
+// 	BPlusTree *BPlusTree
+// }
+
 type TableInfo struct {
 	tableName     string
 	tableId       uint16
@@ -63,12 +70,21 @@ func (meta *MetaData) PageDataType() PageDataType {
 	return META_DATA
 }
 
+type DataEntry struct {
+	Key  ast.SQLExprValue
+	Data []ast.SQLExprValue
+}
+
 type RecordData struct {
-	record [][]ast.SQLExprValue
+	record []DataEntry
 }
 
 func NewRecordData() *RecordData {
 	return &RecordData{}
+}
+
+func (record *RecordData) Record() []DataEntry {
+	return record.record
 }
 
 func (record *RecordData) Raw() []byte {

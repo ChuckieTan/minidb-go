@@ -38,7 +38,8 @@ func (node *BPlusTreeNode) needSplit() bool {
 	return node.Len > node.order-1
 }
 
-// 可以插入重复的数据
+// 可以插入重复的 Key
+// TODO: 如果 Key 和 Value 都存在， 则不插入
 func (node *BPlusTreeNode) insertEntry(key KeyType, value ValueType) (ok bool) {
 	index := sort.Search(int(node.Len), func(i int) bool { return compare(node.Keys[i], key) >= 0 })
 
