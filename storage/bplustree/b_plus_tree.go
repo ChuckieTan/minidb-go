@@ -26,8 +26,13 @@ type BPlusTree struct {
 	pager *p.Pager
 }
 
-// 新建一个 b+树
+// pager: 分页器
+// KeySize: 主键的大小， 单位 byte
+// ValueSize: 值的大小， 单位 byte， 不能小于 4 byte
+// return:
+// 		tree: b+树
 func NewTree(pager *p.Pager, KeySize uint8, ValueSize uint8) (tree BPlusTree) {
+	// order: 每个节点的最大项数，需要为偶数
 	order := uint16((util.PageSize-1024)/uint16(KeySize+ValueSize)) / 2 * 2
 
 	rootNode := newNode(order)
@@ -128,19 +133,11 @@ func (tree *BPlusTree) Search(key KeyType) <-chan ValueType {
 			log.Fatal(err)
 		}
 		leafNode := (*nodePage.Data()).(*BPlusTreeNode)
+		currentIndex := index
 		for {
-			currentIndex := index
-			// 先往管道中放入一个 Value，用于去重
-			// 如果下一个 Value 和当前 Value 相同，则不放入管道
-			preValue := leafNode.Values[currentIndex]
-			valueChan <- preValue
-			currentIndex++
 			for currentIndex < node.Len && compare(leafNode.Keys[currentIndex-1], key) == 0 {
 				currentValue := leafNode.Values[currentIndex]
-				if bytes.Compare(preValue[:], currentValue) != 0 {
-					valueChan <- currentValue
-					preValue = currentValue
-				}
+				valueChan <- currentValue
 				currentIndex++
 			}
 			// 如果循环到当前 node 的最后一个 Value，则尝试获取下一个 node
@@ -164,21 +161,27 @@ func (tree *BPlusTree) Search(key KeyType) <-chan ValueType {
 	return valueChan
 }
 
-func (tree *BPlusTree) Insert(key KeyType, value ValueType) (ok bool) {
-	ok = true
-	node, index := tree.searchLowerInTree(key)
-	if index < node.Len && compare(node.Keys[index], key) == 0 {
-		return false
+// 在 B+树中插入一个 key-value 对，允许有相同的 key
+// key: 主键
+// value: 值
+func (tree *BPlusTree) Insert(key KeyType, value ValueType) {
+	// 如果已经存在相同的 (key, value), 则直接返回
+	valueChan := tree.Search(key)
+	for treeValue := range valueChan {
+		if bytes.Equal(treeValue[:], value[:]) {
+			return
+		}
 	}
+	node, _ := tree.searchLowerInTree(key)
 	// TODO: 新插入的 value 需要放在最后一个位置
-	ok = node.insertEntry(key, value)
+	ok := node.insertEntry(key, value)
 	if !ok {
+		log.Fatalf("insert key-value pair error: %v", key)
 		return
 	}
 	if node.needSplit() {
 		tree.splitLeaf(node)
 	}
-	return
 }
 
 func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {

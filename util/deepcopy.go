@@ -3,6 +3,8 @@ package util
 import (
 	"bytes"
 	"encoding/gob"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func DeepCopy(dst, src interface{}) {
@@ -10,9 +12,9 @@ func DeepCopy(dst, src interface{}) {
 	enc := gob.NewEncoder(&buf)
 	dec := gob.NewDecoder(&buf)
 	if err := enc.Encode(src); err != nil {
-		panic(err)
+		log.Fatalf("encode failed: %v", err)
 	}
 	if err := dec.Decode(dst); err != nil {
-		panic(err)
+		log.Fatalf("decode failed: %v", err)
 	}
 }

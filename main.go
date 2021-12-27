@@ -3,8 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"minidb-go/parser/ast"
-	"minidb-go/storage"
 	"minidb-go/storage/bplustree"
 	"minidb-go/util"
 	"os"
@@ -54,57 +52,38 @@ func main() {
 	util.Decode(buff, q)
 	fmt.Println(p, q)
 
-	tree := bplustree.NewTree()
-	data := bplustree.DataEntry{
-		Key:  ast.SQLInt(1),
-		Data: []ast.SQLExprValue{ast.SQLInt(1), ast.SQLInt(200)},
+	node := bplustree.BPlusTreeNode{
+		Addr:     util.UUID(1),
+		Parent:   util.UUID(2),
+		PreLeaf:  util.UUID(3),
+		NextLeaf: util.UUID(4),
+		Len:      5,
+		Keys: []bplustree.KeyType{
+			util.Uint32ToBytes(4, 1),
+			util.Uint32ToBytes(4, 2),
+			util.Uint32ToBytes(4, 3),
+			util.Uint32ToBytes(4, 4),
+			util.Uint32ToBytes(4, 5),
+		},
+		Values: []bplustree.ValueType{
+			util.Uint32ToBytes(4, 1),
+			util.Uint32ToBytes(4, 2),
+			util.Uint32ToBytes(4, 3),
+			util.Uint32ToBytes(4, 4),
+			util.Uint32ToBytes(4, 5),
+			util.Uint32ToBytes(4, 6),
+		},
 	}
-	tree.Insert(data)
-	fmt.Println(tree.Search(1))
-	data = bplustree.DataEntry{
-		Key:  ast.SQLInt(1),
-		Data: []ast.SQLExprValue{ast.SQLInt(1), ast.SQLInt(300)},
+	raw, _ := node.GobEncode()
+	fmt.Println(raw)
+	var node2 bplustree.BPlusTreeNode
+	tree := bplustree.BPlusTree{
+		KeySize:   4,
+		ValueSize: 4,
+		Order:     5,
 	}
-
-	tree.Update(data)
-	fmt.Println(tree.Search(1))
-
-	meta := storage.GetMetaPage()
-	meta.NewTable("student")
-	meta.InsertData("student", data)
-	fmt.Println(meta.SearchData("student", ast.SQLInt(1)), "storage")
-	data = bplustree.DataEntry{
-		Key:  ast.SQLInt(1),
-		Data: []ast.SQLExprValue{ast.SQLInt(1), ast.SQLInt(400)},
-	}
-	meta.UpdateData("student", data)
-	fmt.Println(meta.SearchData("student", ast.SQLInt(1)), "storage")
-	// sql := "delete from student where id = -1.2;"
-	// sqlParser, _ := parser.NewParser(sql)
-	// statement, _ := sqlParser.ParseDeleteStatement()
-	// fmt.Println(statement)
-	// d := ast.DeleteStatement{}
-
-	// sql := "create table student (id int, name text);"
-	// sqlParser, _ := parser.NewParser(sql)
-	// statement, _ := sqlParser.ParseCreateTableStatement()
-	// fmt.Println(statement)
-	// d := ast.CreateTableStatement{}
-
-	statement := ast.ColumnType(1)
-	d := ast.ColumnType(2)
-	util.Encode(buff, statement)
-	fmt.Println(buff.Bytes())
-	util.Decode(buff, &d)
-	// fmt.Println(d)
-	// lexer, err := parser.NewLexer(sql)
-	// if err == nil {
-	// 	t := lexer.GetNextToken()
-	// 	fmt.Println(t.Val)
-	// 	for t.Type != token.TT_END {
-	// 		t = lexer.GetNextToken()
-	// 		fmt.Println(t.Val)
-	// 	}
-	// }
-	// parser.BenchMark()
+	node2.SetTree(&tree)
+	node2.SetIsLeaf(false)
+	node2.GobDecode(raw)
+	fmt.Println(node2)
 }

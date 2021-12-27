@@ -94,7 +94,8 @@ func (page *Page) Raw() []byte {
 	util.Encode(buff, page.pageType)
 	util.Encode(buff, page.nextPageNum)
 	util.Encode(buff, page.prevPageNum)
-	buff.Write(page.data.Raw())
+	dataByte, _ := page.data.GobEncode()
+	buff.Write(dataByte)
 	return buff.Bytes()
 }
 

@@ -2,13 +2,15 @@ package pager
 
 import (
 	"bytes"
+	"encoding/gob"
 	"io"
 	"minidb-go/parser/ast"
 	"minidb-go/util"
 )
 
 type PageData interface {
-	Raw() []byte
+	gob.GobEncoder
+	gob.GobDecoder
 	// 返回 PageData 的大小，以字节为单位
 	Size() int
 	PageDataType() PageDataType
@@ -55,15 +57,25 @@ type MetaData struct {
 func NewMetaData() *MetaData {
 	return &MetaData{}
 }
+func (m *MetaData) GobEncode() ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(m)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
 
-func (meta *MetaData) Raw() []byte {
-	buff := bytes.NewBuffer(make([]byte, 1024))
-	util.Encode(buff, meta)
-	return buff.Bytes()
+func (m *MetaData) GobDecode(data []byte) error {
+	buf := bytes.NewBuffer(data)
+	dec := gob.NewDecoder(buf)
+	return dec.Decode(m)
 }
 
 func (meta *MetaData) Size() int {
-	return len(meta.Raw())
+	raw, _ := meta.GobEncode()
+	return len(raw)
 }
 
 func (meta *MetaData) PageDataType() PageDataType {
@@ -83,18 +95,29 @@ func NewRecordData() *RecordData {
 	return &RecordData{}
 }
 
+func (r *RecordData) GobEncode() ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(r)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (r *RecordData) GobDecode(data []byte) error {
+	buf := bytes.NewBuffer(data)
+	dec := gob.NewDecoder(buf)
+	return dec.Decode(r)
+}
+
 func (record *RecordData) Record() []DataEntry {
 	return record.record
 }
 
-func (record *RecordData) Raw() []byte {
-	buff := bytes.NewBuffer(make([]byte, 0))
-	util.Encode(buff, record)
-	return buff.Bytes()
-}
-
 func (record *RecordData) Size() int {
-	return len(record.Raw())
+	raw, _ := record.GobEncode()
+	return len(raw)
 }
 
 func (record *RecordData) PageDataType() PageDataType {

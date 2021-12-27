@@ -61,6 +61,8 @@ func decodeType(r io.Reader, v reflect.Value) (err error) {
 			err = decodeStruct(r, v)
 		case reflect.Ptr:
 			err = decodeType(r, v.Elem())
+		case reflect.Uint32:
+			err = binary.Read(r, binary.BigEndian, &value)
 		case reflect.Interface:
 			if v.Addr().CanConvert(reflect.TypeOf((*ast.SQLExprValue)(nil))) {
 				err = decodeSQLExprValue(r, v)
@@ -186,5 +188,6 @@ func Decode(r io.Reader, origin interface{}) (err error) {
 		return
 	}
 	err = decodeType(r, value.Elem())
+
 	return
 }
