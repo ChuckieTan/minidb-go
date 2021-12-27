@@ -30,6 +30,22 @@ func newNode(order uint16) *BPlusTreeNode {
 	return node
 }
 
+func (node *BPlusTreeNode) UpperBound(key KeyType) uint16 {
+	index := sort.Search(
+		int(node.Len),
+		func(i int) bool { return compare(node.Keys[i], key) > 0 },
+	)
+	return uint16(index)
+}
+
+func (node *BPlusTreeNode) LowerBound(key KeyType) uint16 {
+	index := sort.Search(
+		int(node.Len),
+		func(i int) bool { return compare(node.Keys[i], key) >= 0 },
+	)
+	return uint16(index)
+}
+
 func compare(a, b KeyType) int {
 	return bytes.Compare(a[:], b[:])
 }
@@ -41,7 +57,7 @@ func (node *BPlusTreeNode) needSplit() bool {
 // 可以插入重复的 Key
 // TODO: 如果 Key 和 Value 都存在， 则不插入
 func (node *BPlusTreeNode) insertEntry(key KeyType, value ValueType) (ok bool) {
-	index := sort.Search(int(node.Len), func(i int) bool { return compare(node.Keys[i], key) >= 0 })
+	index := node.LowerBound(key)
 
 	// 插入 key
 	copy(node.Keys[index+1:], node.Keys[index:node.order-1])
