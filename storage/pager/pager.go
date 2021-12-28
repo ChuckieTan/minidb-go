@@ -95,10 +95,13 @@ func (pager *Pager) Select(spaceSize uint16, owner uint16) (page *Page, ok bool)
 	if uint16(page.Size()) >= spaceSize {
 		return page, true
 	}
-
-	page = pager.NewPage(NewRecordData(), owner)
-	metaData.tables[owner-1].lastPageNum = page.pageNum
-	return page, true
+	// TODO: 新建 page 需要上层模块来完成
+	// newDataPage := pager.NewPage(NewRecordData(), owner)
+	// newDataPage.nextPageNum = NIL_PAGE_NUM
+	// newDataPage.prevPageNum = page.pageNum
+	// page.nextPageNum = newDataPage.pageNum
+	// metaData.tables[owner-1].lastPageNum = page.pageNum
+	return page, false
 }
 
 func (pager *Pager) NewPage(pageData PageData, owner uint16) *Page {

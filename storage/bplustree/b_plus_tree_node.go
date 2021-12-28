@@ -105,7 +105,7 @@ func (node *BPlusTreeNode) SetIsLeaf(isLeaf bool) {
 }
 
 func (node *BPlusTreeNode) GobEncode() ([]byte, error) {
-	buff := bytes.NewBuffer(make([]byte, 1024))
+	buff := bytes.NewBuffer(make([]byte, 0))
 	intBuff := make([]byte, 4)
 	binary.BigEndian.PutUint32(intBuff, uint32(node.Addr))
 	buff.Write(intBuff)
@@ -171,10 +171,10 @@ func (node *BPlusTreeNode) GobDecode(data []byte) error {
 	}
 	if node.isLeaf {
 		node.Keys = make([]KeyType, node.tree.Order)
-		node.Values = make([]ValueType, node.tree.Order+1)
+		node.Values = make([]ValueType, node.tree.Order)
 	} else {
 		node.Keys = make([]KeyType, node.tree.Order)
-		node.Values = make([]ValueType, node.tree.Order)
+		node.Values = make([]ValueType, node.tree.Order+1)
 	}
 	for i := 0; i < int(node.Len); i++ {
 		node.Keys[i] = make(KeyType, node.tree.KeySize)

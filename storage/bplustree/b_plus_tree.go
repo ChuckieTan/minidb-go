@@ -113,7 +113,7 @@ func (tree *BPlusTree) searchUpperInTree(key KeyType) (*BPlusTreeNode, uint16) {
 }
 
 func (tree *BPlusTree) Search(key KeyType) <-chan ValueType {
-	valueChan := make(chan ValueType, 16)
+	valueChan := make(chan ValueType, 64)
 
 	node, index := tree.searchLowerInTree(key)
 	if uint16(index) == node.Len || compare(node.Keys[index], key) != 0 {

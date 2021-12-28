@@ -40,7 +40,7 @@ type TableInfo struct {
 	tableId       uint16
 	ColumnDefines []ast.ColumnDefine
 
-	// Indexs []IndexInfo
+	// Indexs map[uint16]*IndexInfo
 
 	firstPageNum util.UUID
 	lastPageNum  util.UUID
@@ -82,13 +82,8 @@ func (meta *MetaData) PageDataType() PageDataType {
 	return META_DATA
 }
 
-type DataEntry struct {
-	Key  ast.SQLExprValue
-	Data []ast.SQLExprValue
-}
-
 type RecordData struct {
-	record []DataEntry
+	record []ast.DataEntry
 }
 
 func NewRecordData() *RecordData {
@@ -111,7 +106,7 @@ func (r *RecordData) GobDecode(data []byte) error {
 	return dec.Decode(r)
 }
 
-func (record *RecordData) Record() []DataEntry {
+func (record *RecordData) Record() []ast.DataEntry {
 	return record.record
 }
 
