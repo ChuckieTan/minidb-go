@@ -2,7 +2,7 @@ package pager
 
 import (
 	"io"
-	"math/rand"
+	"minidb-go/storage/pagedata"
 	"minidb-go/util"
 	"minidb-go/util/cache"
 	"minidb-go/util/lru"
@@ -31,12 +31,7 @@ func Create(path string) *Pager {
 		pager.Flush(page)
 	})
 	// 初始化 meta page
-	metaData := NewMetaData()
-	metaData.checksum = rand.Uint32()
-	metaData.checksumCopy = 0
-	metaData.version = util.VERSION
-	metaData.tables = make([]TableInfo, 0)
-
+	metaData := pagedata.NewMetaData()
 	metaPage := pager.NewPage(metaData, 0)
 
 	pager.Flush(metaPage)
@@ -62,11 +57,11 @@ func Open(path string) *Pager {
 	if err != nil {
 		log.Fatalf("get meta page failed: %v", err)
 	}
-	metaData := metaPage.data.(*MetaData)
-	if metaData.version != util.VERSION {
+	metaData := metaPage.data.(*pagedata.MetaData)
+	if metaData.Version() != util.VERSION {
 		log.Fatalf("version not match")
 	}
-	if metaData.checksum != metaData.checksumCopy {
+	if !metaData.Valid() {
 		// TODO: checksum 不匹配时，需要重新恢复数据
 		log.Fatalf("checksum not match")
 	}
@@ -84,12 +79,12 @@ func (pager *Pager) Select(spaceSize uint16, owner uint16) (page *Page, ok bool)
 	if err != nil {
 		log.Fatalf("get meta page failed: %v", err)
 	}
-	metaData := metaPage.data.(*MetaData)
+	metaData := metaPage.data.(*pagedata.MetaData)
 
-	table := metaData.tables[owner-1]
-	page, err = pager.GetPage(table.lastPageNum)
+	table := metaData.GetTableInfoByTableId(owner)
+	page, err = pager.GetPage(table.LastPageNum())
 	if err != nil {
-		log.Fatalf("meta page error, table '%v' last data page not found", table.tableName)
+		log.Fatalf("meta page error, table '%v' last data page not found", table.TableName())
 	}
 
 	if uint16(page.Size()) >= spaceSize {
@@ -130,6 +125,10 @@ func (pager *Pager) GetPage(pageNum util.UUID) (*Page, error) {
 		pager.cache.Set(pageNum, page)
 		return page, nil
 	}
+}
+
+func (pager *Pager) GetMetaPage() (*Page, error) {
+	return pager.GetPage(0)
 }
 
 func (pager *Pager) Flush(page *Page) {

@@ -2,16 +2,13 @@ package bplustree
 
 import (
 	"bytes"
+	"fmt"
+	"minidb-go/storage/index"
 	p "minidb-go/storage/pager"
 	"minidb-go/util"
 
 	log "github.com/sirupsen/logrus"
 )
-
-type KeyType []byte
-
-// Value 的数据类型， 不能小于 32 位 (4 byte)
-type ValueType []byte
 
 // b+树，保存其各个关键节点的页号
 type BPlusTree struct {
@@ -51,8 +48,8 @@ func NewTree(pager *p.Pager, KeySize uint8, ValueSize uint8) (tree BPlusTree) {
 	tree.KeySize = KeySize
 	tree.ValueSize = ValueSize
 
-	rootNode.Keys = make([]KeyType, order)
-	rootNode.Values = make([]ValueType, order+1)
+	rootNode.Keys = make([]index.KeyType, order)
+	rootNode.Values = make([]index.ValueType, order+1)
 	return
 }
 
@@ -69,7 +66,7 @@ func bytesToUUID(bytes []byte) util.UUID {
 // 		node: B+树节点
 func (tree *BPlusTree) getNode(pageNum util.UUID) (node *BPlusTreeNode, err error) {
 	page, err := tree.pager.GetPage(pageNum)
-	node = (*page.Data()).(*BPlusTreeNode)
+	node = (page.Data()).(*BPlusTreeNode)
 	return
 }
 
@@ -78,7 +75,7 @@ func (tree *BPlusTree) getNode(pageNum util.UUID) (node *BPlusTreeNode, err erro
 // return:
 // 		node: key 应该在的 B+树节点
 // 		index: 在节点中的下标
-func (tree *BPlusTree) searchLowerInTree(key KeyType) (*BPlusTreeNode, uint16) {
+func (tree *BPlusTree) searchLowerInTree(key index.KeyType) (*BPlusTreeNode, uint16) {
 	node, err := tree.getNode(tree.Root)
 	if err != nil {
 		log.Fatalf("tree root page load error: %v", err)
@@ -95,7 +92,7 @@ func (tree *BPlusTree) searchLowerInTree(key KeyType) (*BPlusTreeNode, uint16) {
 	return node, uint16(index)
 }
 
-func (tree *BPlusTree) searchUpperInTree(key KeyType) (*BPlusTreeNode, uint16) {
+func (tree *BPlusTree) searchUpperInTree(key index.KeyType) (*BPlusTreeNode, uint16) {
 	node, err := tree.getNode(tree.Root)
 	if err != nil {
 		log.Fatalf("tree root page load error: %v", err)
@@ -112,8 +109,8 @@ func (tree *BPlusTree) searchUpperInTree(key KeyType) (*BPlusTreeNode, uint16) {
 	return node, uint16(index)
 }
 
-func (tree *BPlusTree) Search(key KeyType) <-chan ValueType {
-	valueChan := make(chan ValueType, 64)
+func (tree *BPlusTree) Search(key index.KeyType) <-chan index.ValueType {
+	valueChan := make(chan index.ValueType, 64)
 
 	node, index := tree.searchLowerInTree(key)
 	if uint16(index) == node.Len || compare(node.Keys[index], key) != 0 {
@@ -132,7 +129,7 @@ func (tree *BPlusTree) Search(key KeyType) <-chan ValueType {
 		if err != nil {
 			log.Fatal(err)
 		}
-		leafNode := (*nodePage.Data()).(*BPlusTreeNode)
+		leafNode := nodePage.Data().(*BPlusTreeNode)
 		currentIndex := index
 		for {
 			for currentIndex < node.Len && compare(leafNode.Keys[currentIndex-1], key) == 0 {
@@ -150,7 +147,7 @@ func (tree *BPlusTree) Search(key KeyType) <-chan ValueType {
 				if err != nil {
 					log.Fatal(err)
 				}
-				leafNode = (*nodePage.Data()).(*BPlusTreeNode)
+				leafNode = nodePage.Data().(*BPlusTreeNode)
 				currentIndex = 0
 			} else {
 				break
@@ -164,24 +161,25 @@ func (tree *BPlusTree) Search(key KeyType) <-chan ValueType {
 // 在 B+树中插入一个 key-value 对，允许有相同的 key
 // key: 主键
 // value: 值
-func (tree *BPlusTree) Insert(key KeyType, value ValueType) {
+func (tree *BPlusTree) Insert(key index.KeyType, value index.ValueType) error {
 	// 如果已经存在相同的 (key, value), 则直接返回
 	valueChan := tree.Search(key)
 	for treeValue := range valueChan {
 		if bytes.Equal(treeValue[:], value[:]) {
-			return
+			return nil
 		}
 	}
 	node, _ := tree.searchLowerInTree(key)
 	// TODO: 新插入的 value 需要放在最后一个位置
 	ok := node.insertEntry(key, value)
 	if !ok {
-		log.Fatalf("insert key-value pair error: %v", key)
-		return
+		err := fmt.Errorf("insert key-value pair failed: key: %v, value: %v", key, value)
+		return err
 	}
 	if node.needSplit() {
 		tree.splitLeaf(node)
 	}
+	return nil
 }
 
 func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {

@@ -9,8 +9,9 @@ const (
 )
 
 type ColumnDefine struct {
-	Type ColumnType
-	Name string
+	Type     ColumnType
+	Name     string
+	ColumnId uint16
 }
 
 func (columnDeine *ColumnDefine) SetColumnType(str string) {

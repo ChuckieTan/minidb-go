@@ -312,7 +312,7 @@ func (parser *Parser) parseWhere() (
 func (parser *Parser) parseExpr() (
 	expr ast.SQLExpr, err error,
 ) {
-	expr.LValue, err = parser.parseExprValue()
+	expr.Left, err = parser.parseExprValue()
 	if err != nil {
 		return
 	}
@@ -320,7 +320,7 @@ func (parser *Parser) parseExpr() (
 	if err != nil {
 		return
 	}
-	expr.RValue, err = parser.parseExprValue()
+	expr.Right, err = parser.parseExprValue()
 	if err != nil {
 		return
 	}

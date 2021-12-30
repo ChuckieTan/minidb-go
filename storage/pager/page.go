@@ -100,8 +100,8 @@ func (page *Page) Raw() []byte {
 }
 
 // 以共享的方式返回 Page 的数据
-func (p *Page) Data() *PageData {
-	return &p.data
+func (p *Page) Data() PageData {
+	return p.data
 }
 
 func (p *Page) NextPageNum() util.UUID {
