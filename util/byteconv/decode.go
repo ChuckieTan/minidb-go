@@ -1,4 +1,4 @@
-package util
+package byteconv
 
 import (
 	"encoding/binary"

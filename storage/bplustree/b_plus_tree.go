@@ -17,20 +17,20 @@ type BPlusTree struct {
 	LastLeaf  util.UUID
 
 	Order     uint16
-	KeySize   uint8
-	ValueSize uint8
+	keySize   uint8
+	valueSize uint8
 
 	pager *p.Pager
 }
 
 // pager: 分页器
-// KeySize: 主键的大小， 单位 byte
-// ValueSize: 值的大小， 单位 byte， 不能小于 4 byte
+// keySize: 主键的大小， 单位 byte
+// valueSize: 值的大小， 单位 byte， 不能小于 4 byte
 // return:
 // 		tree: b+树
-func NewTree(pager *p.Pager, KeySize uint8, ValueSize uint8) (tree BPlusTree) {
+func NewTree(pager *p.Pager, keySize uint8, valueSize uint8) (tree BPlusTree) {
 	// order: 每个节点的最大项数，需要为偶数
-	order := uint16((util.PageSize-1024)/uint16(KeySize+ValueSize)) / 2 * 2
+	order := uint16((util.PageSize-1024)/uint16(keySize+valueSize)) / 2 * 2
 
 	rootNode := newNode(order)
 	rootPage := pager.NewPage(rootNode, 0)
@@ -45,12 +45,20 @@ func NewTree(pager *p.Pager, KeySize uint8, ValueSize uint8) (tree BPlusTree) {
 	tree.FirstLeaf = rootNode.Addr
 	tree.LastLeaf = rootNode.Addr
 	tree.Order = order
-	tree.KeySize = KeySize
-	tree.ValueSize = ValueSize
+	tree.keySize = keySize
+	tree.valueSize = valueSize
 
 	rootNode.Keys = make([]index.KeyType, order)
 	rootNode.Values = make([]index.ValueType, order+1)
 	return
+}
+
+func (tree *BPlusTree) KeySize() uint8 {
+	return tree.keySize
+}
+
+func (tree *BPlusTree) ValueSize() uint8 {
+	return tree.valueSize
 }
 
 func bytesToUUID(bytes []byte) util.UUID {
@@ -65,8 +73,10 @@ func bytesToUUID(bytes []byte) util.UUID {
 // return:
 // 		node: B+树节点
 func (tree *BPlusTree) getNode(pageNum util.UUID) (node *BPlusTreeNode, err error) {
-	page, err := tree.pager.GetPage(pageNum)
-	node = (page.Data()).(*BPlusTreeNode)
+	node = &BPlusTreeNode{
+		tree: tree,
+	}
+	page, err := tree.pager.GetPage(pageNum, node)
 	return
 }
 
@@ -191,7 +201,7 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 		newRoot.Parent = 0
 		newRoot.Len = 0
 		newRoot.isLeaf = false
-		newRoot.Values[0] = util.UUIDToBytes(tree.ValueSize, node.Addr)
+		newRoot.Values[0] = util.UUIDToBytes(tree.valueSize, node.Addr)
 
 		node.Parent = newRoot.Addr
 
@@ -233,7 +243,7 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 
 	// 递归更改父节点
 	parentNode, _ := tree.getNode(node.Parent)
-	parentNode.insertEntry(newNode.Keys[0], util.UUIDToBytes(tree.ValueSize, newNode.Addr))
+	parentNode.insertEntry(newNode.Keys[0], util.UUIDToBytes(tree.valueSize, newNode.Addr))
 	if parentNode.needSplit() {
 		tree.splitParent(parentNode)
 	}
@@ -248,7 +258,7 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 		newRoot.Parent = 0
 		newRoot.isLeaf = false
 		newRoot.Len = 0
-		newRoot.Values[0] = util.UUIDToBytes(tree.ValueSize, node.Addr)
+		newRoot.Values[0] = util.UUIDToBytes(tree.valueSize, node.Addr)
 
 		node.Parent = newRoot.Addr
 
@@ -280,7 +290,7 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 	}
 
 	k := node.Keys[node.Len]
-	v := util.UUIDToBytes(tree.ValueSize, newNode.Addr)
+	v := util.UUIDToBytes(tree.valueSize, newNode.Addr)
 	parent, _ := tree.getNode(node.Parent)
 	parent.insertEntry(k, v)
 	if parent.needSplit() {

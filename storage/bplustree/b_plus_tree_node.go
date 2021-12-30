@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"io"
+	"minidb-go/storage/index"
 	"minidb-go/storage/pager"
 	"minidb-go/util"
 	"sort"
@@ -16,8 +18,8 @@ type BPlusTreeNode struct {
 	NextLeaf util.UUID
 
 	Len    uint16
-	Keys   []KeyType
-	Values []ValueType
+	Keys   []index.KeyType
+	Values []index.ValueType
 
 	isLeaf bool
 
@@ -30,12 +32,12 @@ type BPlusTreeNode struct {
 func newNode(order uint16) *BPlusTreeNode {
 	node := new(BPlusTreeNode)
 	node.order = order
-	node.Keys = make([]KeyType, order)
-	node.Values = make([]ValueType, order+1)
+	node.Keys = make([]index.KeyType, order)
+	node.Values = make([]index.ValueType, order+1)
 	return node
 }
 
-func (node *BPlusTreeNode) UpperBound(key KeyType) uint16 {
+func (node *BPlusTreeNode) UpperBound(key index.KeyType) uint16 {
 	index := sort.Search(
 		int(node.Len),
 		func(i int) bool { return compare(node.Keys[i], key) > 0 },
@@ -43,7 +45,7 @@ func (node *BPlusTreeNode) UpperBound(key KeyType) uint16 {
 	return uint16(index)
 }
 
-func (node *BPlusTreeNode) LowerBound(key KeyType) uint16 {
+func (node *BPlusTreeNode) LowerBound(key index.KeyType) uint16 {
 	index := sort.Search(
 		int(node.Len),
 		func(i int) bool { return compare(node.Keys[i], key) >= 0 },
@@ -51,7 +53,7 @@ func (node *BPlusTreeNode) LowerBound(key KeyType) uint16 {
 	return uint16(index)
 }
 
-func compare(a, b KeyType) int {
+func compare(a, b index.KeyType) int {
 	return bytes.Compare(a[:], b[:])
 }
 
@@ -61,7 +63,7 @@ func (node *BPlusTreeNode) needSplit() bool {
 
 // 可以插入重复的 Key
 // TODO: 如果 Key 和 Value 都存在， 则不插入
-func (node *BPlusTreeNode) insertEntry(key KeyType, value ValueType) (ok bool) {
+func (node *BPlusTreeNode) insertEntry(key index.KeyType, value index.ValueType) (ok bool) {
 	index := node.LowerBound(key)
 
 	// 插入 key
@@ -104,7 +106,15 @@ func (node *BPlusTreeNode) SetIsLeaf(isLeaf bool) {
 	node.isLeaf = isLeaf
 }
 
-func (node *BPlusTreeNode) GobEncode() ([]byte, error) {
+func (node *BPlusTreeNode) Tree() *BPlusTree {
+	return node.tree
+}
+
+func (node *BPlusTreeNode) SetTree(tree *BPlusTree) {
+	node.tree = tree
+}
+
+func (node *BPlusTreeNode) Encode() []byte {
 	buff := bytes.NewBuffer(make([]byte, 0))
 	intBuff := make([]byte, 4)
 	binary.BigEndian.PutUint32(intBuff, uint32(node.Addr))
@@ -133,59 +143,51 @@ func (node *BPlusTreeNode) GobEncode() ([]byte, error) {
 	if !node.isLeaf {
 		buff.Write(node.Values[node.Len][:])
 	}
-	return buff.Bytes(), nil
+	return buff.Bytes()
 }
 
-func (node *BPlusTreeNode) Tree() *BPlusTree {
-	return node.tree
-}
-
-func (node *BPlusTreeNode) SetTree(tree *BPlusTree) {
-	node.tree = tree
-}
-
-func (node *BPlusTreeNode) GobDecode(data []byte) error {
+func (node *BPlusTreeNode) Decode(r io.Reader) error {
 	if node.tree == nil {
 		return errors.New("tree is nil")
 	}
-	buff := bytes.NewBuffer(data)
 	intBuff := make([]byte, 4)
-	buff.Read(intBuff)
+	r.Read(intBuff)
 	node.Addr = util.UUID(binary.BigEndian.Uint32(intBuff))
-	buff.Read(intBuff)
+	r.Read(intBuff)
 	node.Parent = util.UUID(binary.BigEndian.Uint32(intBuff))
-	buff.Read(intBuff)
+	r.Read(intBuff)
 	node.PreLeaf = util.UUID(binary.BigEndian.Uint32(intBuff))
-	buff.Read(intBuff)
+	r.Read(intBuff)
 	node.NextLeaf = util.UUID(binary.BigEndian.Uint32(intBuff))
 
 	int16Buff := make([]byte, 2)
-	buff.Read(int16Buff)
+	r.Read(int16Buff)
 	node.Len = binary.BigEndian.Uint16(int16Buff)
 
-	isLeafByte, _ := buff.ReadByte()
-	if isLeafByte == 1 {
+	isLeafByte := make([]byte, 1)
+	r.Read(isLeafByte)
+	if isLeafByte[0] == 1 {
 		node.isLeaf = true
 	} else {
 		node.isLeaf = false
 	}
 	if node.isLeaf {
-		node.Keys = make([]KeyType, node.tree.Order)
-		node.Values = make([]ValueType, node.tree.Order)
+		node.Keys = make([]index.KeyType, node.tree.Order)
+		node.Values = make([]index.ValueType, node.tree.Order)
 	} else {
-		node.Keys = make([]KeyType, node.tree.Order)
-		node.Values = make([]ValueType, node.tree.Order+1)
+		node.Keys = make([]index.KeyType, node.tree.Order)
+		node.Values = make([]index.ValueType, node.tree.Order+1)
 	}
 	for i := 0; i < int(node.Len); i++ {
-		node.Keys[i] = make(KeyType, node.tree.KeySize)
-		buff.Read(node.Keys[i][:])
-		node.Values[i] = make(ValueType, node.tree.ValueSize)
-		buff.Read(node.Values[i][:])
+		node.Keys[i] = make(index.KeyType, node.tree.KeySize())
+		r.Read(node.Keys[i][:])
+		node.Values[i] = make(index.ValueType, node.tree.ValueSize())
+		r.Read(node.Values[i][:])
 	}
 
 	if !node.isLeaf {
-		node.Values[node.Len] = make(ValueType, node.tree.ValueSize)
-		buff.Read(node.Values[node.Len][:])
+		node.Values[node.Len] = make(index.ValueType, node.tree.ValueSize())
+		r.Read(node.Values[node.Len][:])
 	}
 	return nil
 }

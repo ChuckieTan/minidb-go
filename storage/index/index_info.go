@@ -5,8 +5,8 @@ import "minidb-go/parser/ast"
 type IndexType uint8
 
 const (
-	PrimaryInex IndexType = iota // 主键索引
-	SimpleIndex                  // 简单索引
+	PRIMARY_INDEX IndexType = iota // 主键索引
+	SIMPLE_INDEX                   // 简单索引
 )
 
 // 索引信息

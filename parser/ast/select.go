@@ -10,11 +10,4 @@ func (statement SelectStatement) StatementType() string {
 	return "Select"
 }
 
-type DataEntry struct {
-	Key  SQLExprValue
-	Data []SQLExprValue
-}
-
-type Record struct {
-	Data []DataEntry
-}
+type Row []SQLExprValue

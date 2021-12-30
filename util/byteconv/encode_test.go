@@ -1,10 +1,10 @@
-package util_test
+package byteconv_test
 
 import (
 	"bytes"
 	"encoding/gob"
 	"math"
-	"minidb-go/util"
+	"minidb-go/util/byteconv"
 	"testing"
 )
 
@@ -20,7 +20,7 @@ func BenchmarkEncode(b *testing.B) {
 	}
 	for i := 0; i < b.N; i++ {
 		buff := bytes.Buffer{}
-		util.Encode(&buff, v)
+		byteconv.Encode(&buff, v)
 	}
 }
 

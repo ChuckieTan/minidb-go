@@ -1,7 +1,10 @@
 package ast
 
 import (
+	"encoding/binary"
+	"math"
 	"minidb-go/parser/token"
+	"minidb-go/util"
 )
 
 type SQLValueType uint8
@@ -21,6 +24,7 @@ type SQLColumn string
 type SQLExprValue interface {
 	isExpr() bool
 	ValueType() SQLValueType
+	Raw() []byte
 }
 
 func (sqlInt SQLInt) isExpr() bool {
@@ -47,6 +51,26 @@ func (sqlText SQLText) ValueType() SQLValueType {
 }
 func (sqlColumn SQLColumn) ValueType() SQLValueType {
 	return SQL_COLUMN
+}
+
+func (sqlInt SQLInt) Raw() []byte {
+	raw := make([]byte, 8)
+	binary.BigEndian.PutUint64(raw, uint64(sqlInt))
+	return raw
+}
+func (sqlFloat SQLFloat) Raw() []byte {
+	raw := make([]byte, 8)
+	bits := math.Float64bits(float64(sqlFloat))
+	binary.BigEndian.PutUint64(raw, bits)
+	return raw
+}
+func (sqlText SQLText) Raw() []byte {
+	raw := []byte(sqlText)[:util.BPLUSTREE_KEY_LEN]
+	return raw
+}
+func (sqlColumn SQLColumn) Raw() []byte {
+	raw := []byte(sqlColumn)[:util.BPLUSTREE_KEY_LEN]
+	return raw
 }
 
 type SQLExpr struct {

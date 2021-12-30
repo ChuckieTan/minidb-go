@@ -53,7 +53,7 @@ func Open(path string) *Pager {
 		pager.Flush(page)
 	})
 
-	metaPage, err := pager.GetPage(0)
+	metaPage, err := pager.GetPage(0, pagedata.NewMetaData())
 	if err != nil {
 		log.Fatalf("get meta page failed: %v", err)
 	}
@@ -75,14 +75,14 @@ func (pager *Pager) Select(spaceSize uint16, owner uint16) (page *Page, ok bool)
 		return nil, false
 	}
 
-	metaPage, err := pager.GetPage(0)
+	metaPage, err := pager.GetPage(0, pagedata.NewMetaData())
 	if err != nil {
 		log.Fatalf("get meta page failed: %v", err)
 	}
 	metaData := metaPage.data.(*pagedata.MetaData)
 
 	table := metaData.GetTableInfoByTableId(owner)
-	page, err = pager.GetPage(table.LastPageNum())
+	page, err = pager.GetPage(table.LastPageNum(), NewRecordData())
 	if err != nil {
 		log.Fatalf("meta page error, table '%v' last data page not found", table.TableName())
 	}
@@ -112,12 +112,12 @@ func (pager *Pager) NewPage(pageData PageData, owner uint16) *Page {
 	return page
 }
 
-func (pager *Pager) GetPage(pageNum util.UUID) (*Page, error) {
+func (pager *Pager) GetPage(pageNum util.UUID, pageData PageData) (*Page, error) {
 	if page, hit := pager.cache.Get(pageNum); hit {
 		return page.(*Page), nil
 	} else {
 		pager.file.Seek(0, io.SeekEnd)
-		page, err := LoadPage(pager.file)
+		page, err := LoadPage(pager.file, pageData)
 		if err != nil {
 			log.Errorf("load page failed: %v", err)
 			return nil, err
@@ -127,8 +127,12 @@ func (pager *Pager) GetPage(pageNum util.UUID) (*Page, error) {
 	}
 }
 
-func (pager *Pager) GetMetaPage() (*Page, error) {
-	return pager.GetPage(0)
+func (pager *Pager) GetMetaPage() *Page {
+	page, err := pager.GetPage(0, pagedata.NewMetaData())
+	if err != nil {
+		log.Fatalf("get meta page failed: %v", err)
+	}
+	return page
 }
 
 func (pager *Pager) Flush(page *Page) {

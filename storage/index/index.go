@@ -8,4 +8,7 @@ type ValueType []byte
 type Index interface {
 	Search(key KeyType) <-chan ValueType
 	Insert(key KeyType, value ValueType) error
+
+	KeySize() uint8
+	ValueSize() uint8
 }

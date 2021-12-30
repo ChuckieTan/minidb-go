@@ -8,8 +8,8 @@ import (
 )
 
 type PageData interface {
-	gob.GobEncoder
-	gob.GobDecoder
+	Encode() []byte
+	Decode(r io.Reader) error
 	// 返回 PageData 的大小，以字节为单位
 	Size() int
 }
@@ -22,40 +22,35 @@ const (
 	INDEX_DATA
 )
 
-func LoadPageData(r io.Reader, pageType PageType) PageData {
-	panic("implement me")
-}
-
 type RecordData struct {
-	record []ast.DataEntry
+	records []ast.Row
 }
 
 func NewRecordData() *RecordData {
 	return &RecordData{}
 }
 
-func (r *RecordData) GobEncode() ([]byte, error) {
+func (r *RecordData) Encode() []byte {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(r)
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	return buf.Bytes(), nil
+	return buf.Bytes()
 }
 
-func (r *RecordData) GobDecode(data []byte) error {
-	buf := bytes.NewBuffer(data)
-	dec := gob.NewDecoder(buf)
-	return dec.Decode(r)
+func (record *RecordData) Decode(r io.Reader) error {
+	dec := gob.NewDecoder(r)
+	return dec.Decode(record)
 }
 
-func (record *RecordData) Record() []ast.DataEntry {
-	return record.record
+func (record *RecordData) Record() []ast.Row {
+	return record.records
 }
 
 func (record *RecordData) Size() int {
-	raw, _ := record.GobEncode()
+	raw := record.Encode()
 	return len(raw)
 }
 

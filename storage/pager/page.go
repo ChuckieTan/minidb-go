@@ -5,6 +5,7 @@ import (
 	"io"
 	"minidb-go/transaction"
 	"minidb-go/util"
+	"minidb-go/util/byteconv"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -55,29 +56,30 @@ func newPage(pageNum util.UUID,
 	}
 }
 
-func LoadPage(r io.Reader) (*Page, error) {
+func LoadPage(r io.Reader, pageData PageData) (*Page, error) {
 	page := &Page{}
-	err := util.Decode(r, &page.pageNum)
+	err := byteconv.Decode(r, &page.pageNum)
 	if err != nil {
 		log.Errorf("decode page num failed: %v", err)
 		return nil, err
 	}
-	err = util.Decode(r, &page.pageType)
+	err = byteconv.Decode(r, &page.pageType)
 	if err != nil {
 		log.Errorf("decode page type failed: %v", err)
 		return nil, err
 	}
-	err = util.Decode(r, &page.nextPageNum)
+	err = byteconv.Decode(r, &page.nextPageNum)
 	if err != nil {
 		log.Errorf("decode next page num failed: %v", err)
 		return nil, err
 	}
-	err = util.Decode(r, &page.prevPageNum)
+	err = byteconv.Decode(r, &page.prevPageNum)
 	if err != nil {
 		log.Errorf("decode prev page num failed: %v", err)
 		return nil, err
 	}
-	page.data = LoadPageData(r, page.pageType)
+	page.data = pageData
+	page.data.Decode(r)
 	page.dataCopy = page.data
 	page.dirty = false
 	return page, nil
@@ -90,11 +92,11 @@ func (p *Page) PageNum() util.UUID {
 // 返回 Page 数据的二进制
 func (page *Page) Raw() []byte {
 	buff := bytes.NewBuffer(make([]byte, util.PageSize))
-	util.Encode(buff, page.pageNum)
-	util.Encode(buff, page.pageType)
-	util.Encode(buff, page.nextPageNum)
-	util.Encode(buff, page.prevPageNum)
-	dataByte, _ := page.data.GobEncode()
+	byteconv.Encode(buff, page.pageNum)
+	byteconv.Encode(buff, page.pageType)
+	byteconv.Encode(buff, page.nextPageNum)
+	byteconv.Encode(buff, page.prevPageNum)
+	dataByte := page.data.Encode()
 	buff.Write(dataByte)
 	return buff.Bytes()
 }

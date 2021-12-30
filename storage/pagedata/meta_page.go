@@ -3,6 +3,7 @@ package pagedata
 import (
 	"bytes"
 	"encoding/gob"
+	"io"
 	"math/rand"
 	"minidb-go/parser/ast"
 	"minidb-go/storage/index"
@@ -91,23 +92,22 @@ func NewMetaData() *MetaData {
 	}
 }
 
-func (m *MetaData) GobEncode() ([]byte, error) {
+func (m *MetaData) Encode() []byte {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(m)
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	return buf.Bytes(), nil
+	return buf.Bytes()
 }
 
-func (m *MetaData) GobDecode(data []byte) error {
-	buf := bytes.NewBuffer(data)
-	dec := gob.NewDecoder(buf)
+func (m *MetaData) Decode(r io.Reader) error {
+	dec := gob.NewDecoder(r)
 	return dec.Decode(m)
 }
 
 func (meta *MetaData) Size() int {
-	raw, _ := meta.GobEncode()
+	raw := meta.Encode()
 	return len(raw)
 }
