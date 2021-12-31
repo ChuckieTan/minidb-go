@@ -11,8 +11,10 @@ import (
 )
 
 type TableInfo struct {
-	tableName     string
-	tableId       uint16
+	tableName string
+	tableId   uint16
+
+	primaryKey    string
 	columnDefines []ast.ColumnDefine
 
 	indexs map[string]index.IndexInfo
@@ -23,6 +25,10 @@ type TableInfo struct {
 
 func (ti *TableInfo) Indexs() map[string]index.IndexInfo {
 	return ti.indexs
+}
+
+func (ti *TableInfo) PrimaryKey() string {
+	return ti.primaryKey
 }
 
 func (ti *TableInfo) ColumnDefines() []ast.ColumnDefine {

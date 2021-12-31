@@ -3,6 +3,7 @@ package pager
 import (
 	"bytes"
 	"io"
+	"minidb-go/storage/pager/pagedata"
 	"minidb-go/transaction"
 	"minidb-go/util"
 	"minidb-go/util/byteconv"
@@ -31,16 +32,16 @@ type Page struct {
 
 	pageType PageType
 
-	data     PageData
-	dataCopy PageData
-
 	dirty bool
+
+	data     pagedata.PageData
+	dataCopy pagedata.PageData
 
 	rwlock sync.RWMutex
 }
 
 func newPage(pageNum util.UUID,
-	pageData PageData,
+	pageData pagedata.PageData,
 	owner uint16) *Page {
 
 	return &Page{
@@ -56,7 +57,7 @@ func newPage(pageNum util.UUID,
 	}
 }
 
-func LoadPage(r io.Reader, pageData PageData) (*Page, error) {
+func LoadPage(r io.Reader, pageData pagedata.PageData) (*Page, error) {
 	page := &Page{}
 	err := byteconv.Decode(r, &page.pageNum)
 	if err != nil {
@@ -78,6 +79,17 @@ func LoadPage(r io.Reader, pageData PageData) (*Page, error) {
 		log.Errorf("decode prev page num failed: %v", err)
 		return nil, err
 	}
+	err = byteconv.Decode(r, &page.dirty)
+	if err != nil {
+		log.Errorf("decode dirty flag failed: %v", err)
+		return nil, err
+	}
+	var dataLen uint16
+	err = byteconv.Decode(r, &dataLen)
+	if err != nil {
+		log.Errorf("decode data length failed: %v", err)
+		return nil, err
+	}
 	page.data = pageData
 	page.data.Decode(r)
 	page.dataCopy = page.data
@@ -89,20 +101,23 @@ func (p *Page) PageNum() util.UUID {
 	return p.pageNum
 }
 
-// 返回 Page 数据的二进制
+// 返回 Page 数据的二进制，PageSize的大小
 func (page *Page) Raw() []byte {
-	buff := bytes.NewBuffer(make([]byte, util.PageSize))
+	buff := bytes.NewBuffer(make([]byte, util.PAGE_SIZE))
 	byteconv.Encode(buff, page.pageNum)
 	byteconv.Encode(buff, page.pageType)
 	byteconv.Encode(buff, page.nextPageNum)
 	byteconv.Encode(buff, page.prevPageNum)
+	byteconv.Encode(buff, page.dirty)
 	dataByte := page.data.Encode()
 	buff.Write(dataByte)
+	zeroLen := util.PAGE_SIZE - len(buff.Bytes())
+	buff.Write(make([]byte, zeroLen))
 	return buff.Bytes()
 }
 
 // 以共享的方式返回 Page 的数据
-func (p *Page) Data() PageData {
+func (p *Page) Data() pagedata.PageData {
 	return p.data
 }
 

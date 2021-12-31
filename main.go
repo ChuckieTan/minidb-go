@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"minidb-go/storage/bplustree"
+	"minidb-go/storage/index"
 	"minidb-go/util"
+	"minidb-go/util/byteconv"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -47,9 +49,9 @@ func main() {
 	q := new(P)
 	// p := []int32{1, 2, 3, 4, 5}
 	// var q []int32
-	util.Encode(buff, p)
+	byteconv.Encode(buff, p)
 	fmt.Println(buff.Bytes())
-	util.Decode(buff, q)
+	byteconv.Decode(buff, q)
 	fmt.Println(p, q)
 
 	node := bplustree.BPlusTreeNode{
@@ -58,14 +60,14 @@ func main() {
 		PreLeaf:  util.UUID(3),
 		NextLeaf: util.UUID(4),
 		Len:      5,
-		Keys: []bplustree.KeyType{
+		Keys: []index.KeyType{
 			util.Uint32ToBytes(4, 1),
 			util.Uint32ToBytes(4, 2),
 			util.Uint32ToBytes(4, 3),
 			util.Uint32ToBytes(4, 4),
 			util.Uint32ToBytes(4, 5),
 		},
-		Values: []bplustree.ValueType{
+		Values: []index.ValueType{
 			util.Uint32ToBytes(4, 1),
 			util.Uint32ToBytes(4, 2),
 			util.Uint32ToBytes(4, 3),
@@ -74,16 +76,15 @@ func main() {
 			util.Uint32ToBytes(4, 6),
 		},
 	}
-	raw, _ := node.GobEncode()
+	raw := node.Encode()
 	fmt.Println(raw)
 	var node2 bplustree.BPlusTreeNode
-	tree := bplustree.BPlusTree{
-		KeySize:   4,
-		ValueSize: 4,
-		Order:     5,
-	}
-	node2.SetTree(&tree)
+	tree := &bplustree.BPlusTree{}
+	tree.SetOrder(5)
+	tree.SetKeySize(4)
+	tree.SetValueSize(4)
+	node2.SetTree(tree)
 	node2.SetIsLeaf(false)
-	node2.GobDecode(raw)
+	node2.Decode(bytes.NewBuffer(raw))
 	fmt.Println(node2)
 }

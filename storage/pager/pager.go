@@ -2,7 +2,7 @@ package pager
 
 import (
 	"io"
-	"minidb-go/storage/pagedata"
+	"minidb-go/storage/pager/pagedata"
 	"minidb-go/util"
 	"minidb-go/util/cache"
 	"minidb-go/util/lru"
@@ -71,7 +71,7 @@ func Open(path string) *Pager {
 
 // 选择一个具有可用空间的 page
 func (pager *Pager) Select(spaceSize uint16, owner uint16) (page *Page, ok bool) {
-	if spaceSize > util.PageSize {
+	if spaceSize > util.PAGE_SIZE {
 		return nil, false
 	}
 
@@ -82,7 +82,7 @@ func (pager *Pager) Select(spaceSize uint16, owner uint16) (page *Page, ok bool)
 	metaData := metaPage.data.(*pagedata.MetaData)
 
 	table := metaData.GetTableInfoByTableId(owner)
-	page, err = pager.GetPage(table.LastPageNum(), NewRecordData())
+	page, err = pager.GetPage(table.LastPageNum(), pagedata.NewRecordData())
 	if err != nil {
 		log.Fatalf("meta page error, table '%v' last data page not found", table.TableName())
 	}
@@ -99,20 +99,20 @@ func (pager *Pager) Select(spaceSize uint16, owner uint16) (page *Page, ok bool)
 	return page, false
 }
 
-func (pager *Pager) NewPage(pageData PageData, owner uint16) *Page {
+func (pager *Pager) NewPage(pageData pagedata.PageData, owner uint16) *Page {
 	fileSize, err := pager.file.Seek(0, os.SEEK_END)
 	if err != nil {
 		log.Fatalf("seek file failed: %v", err)
 	}
 
-	pageNum := util.UUID(fileSize / util.PageSize)
+	pageNum := util.UUID(fileSize / util.PAGE_SIZE)
 	page := newPage(pageNum, pageData, owner)
 	pager.cache.Set(pageNum, page)
 	pager.Flush(page)
 	return page
 }
 
-func (pager *Pager) GetPage(pageNum util.UUID, pageData PageData) (*Page, error) {
+func (pager *Pager) GetPage(pageNum util.UUID, pageData pagedata.PageData) (*Page, error) {
 	if page, hit := pager.cache.Get(pageNum); hit {
 		return page.(*Page), nil
 	} else {
@@ -136,8 +136,8 @@ func (pager *Pager) GetMetaPage() *Page {
 }
 
 func (pager *Pager) Flush(page *Page) {
-	n, err := pager.file.WriteAt(page.Raw(), int64(uint32(page.pageNum)*util.PageSize))
-	if err != nil || n != util.PageSize {
+	n, err := pager.file.WriteAt(page.Raw(), int64(uint32(page.pageNum)*util.PAGE_SIZE))
+	if err != nil || n != util.PAGE_SIZE {
 		log.Fatalf("write page %d failed: %v", page.pageNum, err)
 	}
 	pager.file.Sync()

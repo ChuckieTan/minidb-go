@@ -16,7 +16,7 @@ type BPlusTree struct {
 	FirstLeaf util.UUID
 	LastLeaf  util.UUID
 
-	Order     uint16
+	order     uint16
 	keySize   uint8
 	valueSize uint8
 
@@ -30,7 +30,7 @@ type BPlusTree struct {
 // 		tree: b+树
 func NewTree(pager *p.Pager, keySize uint8, valueSize uint8) (tree BPlusTree) {
 	// order: 每个节点的最大项数，需要为偶数
-	order := uint16((util.PageSize-1024)/uint16(keySize+valueSize)) / 2 * 2
+	order := uint16((util.PAGE_SIZE-1024)/uint16(keySize+valueSize)) / 2 * 2
 
 	rootNode := newNode(order)
 	rootPage := pager.NewPage(rootNode, 0)
@@ -44,7 +44,7 @@ func NewTree(pager *p.Pager, keySize uint8, valueSize uint8) (tree BPlusTree) {
 	tree.Root = rootNode.Addr
 	tree.FirstLeaf = rootNode.Addr
 	tree.LastLeaf = rootNode.Addr
-	tree.Order = order
+	tree.order = order
 	tree.keySize = keySize
 	tree.valueSize = valueSize
 
@@ -53,12 +53,28 @@ func NewTree(pager *p.Pager, keySize uint8, valueSize uint8) (tree BPlusTree) {
 	return
 }
 
+func (tree *BPlusTree) Order() uint16 {
+	return tree.order
+}
+
+func (tree *BPlusTree) SetOrder(order uint16) {
+	tree.order = order
+}
+
 func (tree *BPlusTree) KeySize() uint8 {
 	return tree.keySize
 }
 
 func (tree *BPlusTree) ValueSize() uint8 {
 	return tree.valueSize
+}
+
+func (tree *BPlusTree) SetKeySize(keySize uint8) {
+	tree.keySize = keySize
+}
+
+func (tree *BPlusTree) SetValueSize(valueSize uint8) {
+	tree.valueSize = valueSize
 }
 
 func bytesToUUID(bytes []byte) util.UUID {
@@ -76,7 +92,7 @@ func (tree *BPlusTree) getNode(pageNum util.UUID) (node *BPlusTreeNode, err erro
 	node = &BPlusTreeNode{
 		tree: tree,
 	}
-	page, err := tree.pager.GetPage(pageNum, node)
+	_, err = tree.pager.GetPage(pageNum, node)
 	return
 }
 
@@ -135,11 +151,11 @@ func (tree *BPlusTree) Search(key index.KeyType) <-chan index.ValueType {
 
 	// 往 ValueChan 中放入数据
 	go func() {
-		nodePage, err := tree.pager.GetPage(nodePageNum)
+		defer close(valueChan)
+		leafNode, err := tree.getNode(nodePageNum)
 		if err != nil {
 			log.Fatal(err)
 		}
-		leafNode := nodePage.Data().(*BPlusTreeNode)
 		currentIndex := index
 		for {
 			for currentIndex < node.Len && compare(leafNode.Keys[currentIndex-1], key) == 0 {
@@ -153,17 +169,15 @@ func (tree *BPlusTree) Search(key index.KeyType) <-chan index.ValueType {
 				if leafNode.NextLeaf == 0 {
 					break
 				}
-				nodePage, err = tree.pager.GetPage(leafNode.NextLeaf)
+				leafNode, err = tree.getNode(leafNode.NextLeaf)
 				if err != nil {
 					log.Fatal(err)
 				}
-				leafNode = nodePage.Data().(*BPlusTreeNode)
 				currentIndex = 0
 			} else {
 				break
 			}
 		}
-		close(valueChan)
 	}()
 	return valueChan
 }
@@ -195,7 +209,7 @@ func (tree *BPlusTree) Insert(key index.KeyType, value index.ValueType) error {
 func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
 	if node.Addr == tree.Root {
-		newRoot := newNode(tree.Order)
+		newRoot := newNode(tree.order)
 		rootPage := tree.pager.NewPage(newRoot, 0)
 		newRoot.Addr = rootPage.PageNum()
 		newRoot.Parent = 0
@@ -210,12 +224,12 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 		tree.LastLeaf = node.Addr
 	}
 
-	newNode := newNode(tree.Order)
+	newNode := newNode(tree.order)
 	newNodePage := tree.pager.NewPage(newNode, 0)
 	newNode.Addr = newNodePage.PageNum()
 	newNode.Parent = node.Parent
 
-	order := tree.Order
+	order := tree.order
 	// 复制一半元素
 	for i := order / 2; i < node.Len; i++ {
 		newNode.Keys[i-order/2] = node.Keys[i]
@@ -252,7 +266,7 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
 	if node.Addr == tree.Root {
-		newRoot := newNode(tree.Order)
+		newRoot := newNode(tree.order)
 		newRootPage := tree.pager.NewPage(newRoot, 0)
 		newRoot.Addr = newRootPage.PageNum()
 		newRoot.Parent = 0
@@ -265,12 +279,12 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 		tree.Root = newRoot.Addr
 	}
 
-	newNode := newNode(tree.Order)
+	newNode := newNode(tree.order)
 	newNodePage := tree.pager.NewPage(newNode, 0)
 	newNode.Addr = newNodePage.PageNum()
 
 	// 复制一半元素
-	order := tree.Order
+	order := tree.order
 	for i := order / 2; i < node.Len; i++ {
 		newNode.Keys[i-order/2] = node.Keys[i]
 		newNode.Values[i-order/2] = node.Values[i]

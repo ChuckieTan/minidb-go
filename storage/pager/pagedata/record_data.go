@@ -1,4 +1,4 @@
-package pager
+package pagedata
 
 import (
 	"bytes"
@@ -7,23 +7,8 @@ import (
 	"minidb-go/parser/ast"
 )
 
-type PageData interface {
-	Encode() []byte
-	Decode(r io.Reader) error
-	// 返回 PageData 的大小，以字节为单位
-	Size() int
-}
-
-type PageDataType uint8
-
-const (
-	META_DATA PageDataType = iota
-	RECORE_DATA
-	INDEX_DATA
-)
-
 type RecordData struct {
-	records []ast.Row
+	rows []ast.Row
 }
 
 func NewRecordData() *RecordData {
@@ -45,8 +30,8 @@ func (record *RecordData) Decode(r io.Reader) error {
 	return dec.Decode(record)
 }
 
-func (record *RecordData) Record() []ast.Row {
-	return record.records
+func (record *RecordData) Rows() []ast.Row {
+	return record.rows
 }
 
 func (record *RecordData) Size() int {

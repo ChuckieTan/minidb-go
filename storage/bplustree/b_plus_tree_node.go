@@ -6,7 +6,7 @@ import (
 	"errors"
 	"io"
 	"minidb-go/storage/index"
-	"minidb-go/storage/pager"
+	"minidb-go/storage/pager/pagedata"
 	"minidb-go/util"
 	"sort"
 )
@@ -94,8 +94,8 @@ func (node *BPlusTreeNode) Size() int {
 	return 4 + 4 + 4 + 2 + keySize + ValueSize + 1 + 2
 }
 
-func (node *BPlusTreeNode) PageDataType() pager.PageDataType {
-	return pager.INDEX_DATA
+func (node *BPlusTreeNode) PageDataType() pagedata.PageDataType {
+	return pagedata.INDEX_DATA
 }
 
 func (node *BPlusTreeNode) IsLeaf() bool {
@@ -172,11 +172,11 @@ func (node *BPlusTreeNode) Decode(r io.Reader) error {
 		node.isLeaf = false
 	}
 	if node.isLeaf {
-		node.Keys = make([]index.KeyType, node.tree.Order)
-		node.Values = make([]index.ValueType, node.tree.Order)
+		node.Keys = make([]index.KeyType, int(node.tree.order))
+		node.Values = make([]index.ValueType, int(node.tree.order))
 	} else {
-		node.Keys = make([]index.KeyType, node.tree.Order)
-		node.Values = make([]index.ValueType, node.tree.Order+1)
+		node.Keys = make([]index.KeyType, int(node.tree.order))
+		node.Values = make([]index.ValueType, int(node.tree.order)+1)
 	}
 	for i := 0; i < int(node.Len); i++ {
 		node.Keys[i] = make(index.KeyType, node.tree.KeySize())

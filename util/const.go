@@ -4,11 +4,11 @@ const (
 	// MAX_UUID is the maximum value of UUID.
 	MAX_UUID = 1<<32 - 1
 
-	// PageSize is the size of a page.
-	PageSize = 8192 // 16KB
+	// PAGE_SIZE is the size of a page.
+	PAGE_SIZE = 8192 // 16KB
 
 	// MAX_PAGE_SIZE is the maximum value of PageSize.'
-	MAX_PAGE_SIZE = PageSize - 1
+	MAX_PAGE_SIZE = PAGE_SIZE - 1
 
 	// MIN_PAGE_SIZE is the minimum value of PageSize.
 	MIN_PAGE_SIZE = 0
