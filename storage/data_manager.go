@@ -15,6 +15,7 @@ import (
 	"minidb-go/storage/pager"
 	"minidb-go/storage/pager/pagedata"
 	"minidb-go/util"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -58,9 +59,8 @@ func getIndex(tableId uint16, columnId uint16) *bplustree.BPlusTree {
 
 func (dm *DataManager) SelectData(selectStatement *ast.SelectStatement) (
 	<-chan ast.Row, error) {
-	rows := make(chan ast.Row)
-	metaPage := dm.pager.GetMetaPage()
-	metaData := metaPage.Data().(*pagedata.MetaData)
+	rows := make(chan ast.Row, 64)
+	metaData := dm.pager.GetMetaData()
 	// 获取表信息
 	tableInfo := metaData.GetTableInfo(selectStatement.TableSource)
 	if tableInfo == nil {
@@ -86,24 +86,33 @@ func (dm *DataManager) SelectData(selectStatement *ast.SelectStatement) (
 				valueChan := indexInfo.Index.Search(expr.Right.Raw())
 				if indexInfo.IndexType == index.PRIMARY_INDEX {
 					// 主键索引，直接遍历数据页
-					for i := 0; i < 2; i++ {
+					w := sync.WaitGroup{}
+					w.Add(util.MAX_SEARCH_THRESHOLD)
+					for i := 0; i < util.MAX_SEARCH_THRESHOLD; i++ {
 						go func() {
+							defer w.Done()
 							for pageNumBytes := range valueChan {
 								pageNum := util.BytesToUUID(pageNumBytes)
 								dm.traverseData(rows, pageNum, expr.Right)
 							}
 						}()
 					}
+					go func() {
+						w.Wait()
+						close(rows)
+					}()
 					return rows, nil
 				} else {
-					// 非主键索引，需要先查找主键索引，再遍历数据页
-					indexChan := indexInfo.Index.Search(expr.Right.Raw())
-
+					// 非主键索引相等
+					primaryIndex := indexs[tableInfo.PrimaryKey()].Index
+					dm.simpleEqualSearch(rows, indexInfo.Index, primaryIndex, expr.Right)
+					return rows, nil
 				}
 			} else {
 				if expr.Left == expr.Right {
 					// TODO: 全表扫描
 				} else {
+					// 左值和右值不相等，结果为空
 					close(rows)
 					return rows, nil
 				}
@@ -112,11 +121,41 @@ func (dm *DataManager) SelectData(selectStatement *ast.SelectStatement) (
 			err := fmt.Errorf("only support equal condition")
 			return rows, err
 		}
+	} else {
+		// 没有where条件，全表扫描
+		// TODO: 全表扫描
 	}
 	return rows, nil
 }
 
-func (dm *DataManager) searchByIndex(rows <-chan ast.Row, index *index.Index, value string) {
+func (dm *DataManager) searchByPrimaryKey(rows <-chan ast.Row, index *index.Index, value ast.SQLExprValue) {
+	return
+}
+
+// 非主键索引相等查找
+func (dm *DataManager) simpleEqualSearch(rows chan<- ast.Row, simpleIndex index.Index,
+	primaryIndex index.Index, value ast.SQLExprValue) {
+	// 先查找主键索引
+	indexChan := simpleIndex.Search(value.Raw())
+	w := sync.WaitGroup{}
+	w.Add(util.MAX_SEARCH_THRESHOLD)
+	for i := 0; i < util.MAX_SEARCH_THRESHOLD; i++ {
+		go func() {
+			defer w.Done()
+			// 根据主键查找数据页
+			for primaryKeyBytes := range indexChan {
+				pageNumChan := primaryIndex.Search(index.KeyType(primaryKeyBytes))
+				for pageNumBytes := range pageNumChan {
+					pageNum := util.BytesToUUID(pageNumBytes)
+					dm.traverseData(rows, pageNum, value)
+				}
+			}
+		}()
+	}
+	go func() {
+		w.Wait()
+		close(rows)
+	}()
 	return
 }
 

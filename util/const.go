@@ -5,7 +5,7 @@ const (
 	MAX_UUID = 1<<32 - 1
 
 	// PAGE_SIZE is the size of a page.
-	PAGE_SIZE = 8192 // 16KB
+	PAGE_SIZE = 8192 // 8KB
 
 	// MAX_PAGE_SIZE is the maximum value of PageSize.'
 	MAX_PAGE_SIZE = PAGE_SIZE - 1
@@ -33,4 +33,6 @@ const (
 	BPLUSTREE_KEY_LEN = 32
 
 	VERSION = "0.0.1"
+
+	MAX_SEARCH_THRESHOLD = 2
 )

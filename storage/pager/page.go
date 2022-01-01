@@ -41,8 +41,7 @@ type Page struct {
 }
 
 func newPage(pageNum util.UUID,
-	pageData pagedata.PageData,
-	owner uint16) *Page {
+	pageData pagedata.PageData) *Page {
 
 	return &Page{
 		pageNum: pageNum,

@@ -28,7 +28,7 @@ func (ti *TableInfo) Indexs() map[string]index.IndexInfo {
 }
 
 func (ti *TableInfo) PrimaryKey() string {
-	return ti.primaryKey
+	return ti.columnDefines[0].Name
 }
 
 func (ti *TableInfo) ColumnDefines() []ast.ColumnDefine {
@@ -60,7 +60,7 @@ type MetaData struct {
 	checksumCopy uint32
 
 	version string
-	tables  []TableInfo
+	tables  map[string]*TableInfo
 }
 
 func (md *MetaData) Valid() bool {
@@ -74,16 +74,7 @@ func (meta *MetaData) Version() string {
 func (meta *MetaData) GetTableInfo(tableName string) *TableInfo {
 	for _, table := range meta.tables {
 		if table.tableName == tableName {
-			return &table
-		}
-	}
-	return nil
-}
-
-func (meta *MetaData) GetTableInfoByTableId(tableId uint16) *TableInfo {
-	for _, table := range meta.tables {
-		if table.tableId == tableId {
-			return &table
+			return table
 		}
 	}
 	return nil
@@ -94,7 +85,7 @@ func NewMetaData() *MetaData {
 		checksum:     rand.Uint32(),
 		checksumCopy: 0,
 		version:      util.VERSION,
-		tables:       make([]TableInfo, 0),
+		tables:       make(map[string]*TableInfo, 0),
 	}
 }
 
