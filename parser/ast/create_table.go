@@ -1,9 +1,11 @@
 package ast
 
+import "minidb-go/storage/index"
+
 type ColumnType uint8
 
 const (
-	CT_INT = iota
+	CT_INT ColumnType = iota
 	CT_FLOAT
 	CT_TEXT
 )
@@ -12,6 +14,8 @@ type ColumnDefine struct {
 	Type     ColumnType
 	Name     string
 	ColumnId uint16
+
+	Index index.Index
 }
 
 func (columnDeine *ColumnDefine) SetColumnType(str string) {

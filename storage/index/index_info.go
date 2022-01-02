@@ -1,7 +1,5 @@
 package index
 
-import "minidb-go/parser/ast"
-
 type IndexType uint8
 
 const (
@@ -10,11 +8,6 @@ const (
 )
 
 // 索引信息
-type IndexInfo struct {
-	ColumnId  uint16
-	Index     Index
-	IndexType IndexType
-
-	KeyType   ast.SQLValueType
-	ValueType ast.SQLValueType
-}
+// type IndexInfo struct {
+// 	Index Index
+// }

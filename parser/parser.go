@@ -118,7 +118,7 @@ func (parser *Parser) ParseInsertIntoStatement() (
 		return
 	}
 	if t := parser.lexer.GetNextToken(); t.Type == token.TT_IDENTIFIER {
-		statement.TableSource = t.Val
+		statement.TableName = t.Val
 	} else {
 		err = fmt.Errorf("expect a table name, given %v", t.Val)
 		log.Error(err.Error())
@@ -134,7 +134,7 @@ func (parser *Parser) ParseInsertIntoStatement() (
 		if err != nil {
 			return statement, err
 		}
-		statement.ValueList = append(statement.ValueList, value)
+		statement.Row = append(statement.Row, value)
 		if !parser.match(token.TT_COMMA) {
 			break
 		}

@@ -1,8 +1,8 @@
 package ast
 
 type InsertIntoStatement struct {
-	TableSource string
-	ValueList   []SQLExprValue
+	TableName string
+	Row       Row
 }
 
 func (statement InsertIntoStatement) StatementType() string {

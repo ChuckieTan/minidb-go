@@ -6,7 +6,6 @@ import (
 	"io"
 	"math/rand"
 	"minidb-go/parser/ast"
-	"minidb-go/storage/index"
 	"minidb-go/util"
 )
 
@@ -14,25 +13,27 @@ type TableInfo struct {
 	tableName string
 	tableId   uint16
 
-	primaryKey    string
-	columnDefines []ast.ColumnDefine
-
-	indexs map[string]index.IndexInfo
+	columnDefines []*ast.ColumnDefine
 
 	firstPageNum util.UUID
 	lastPageNum  util.UUID
-}
-
-func (ti *TableInfo) Indexs() map[string]index.IndexInfo {
-	return ti.indexs
 }
 
 func (ti *TableInfo) PrimaryKey() string {
 	return ti.columnDefines[0].Name
 }
 
-func (ti *TableInfo) ColumnDefines() []ast.ColumnDefine {
+func (ti *TableInfo) ColumnDefines() []*ast.ColumnDefine {
 	return ti.columnDefines
+}
+
+func (ti *TableInfo) GetColumnDefine(columnName string) *ast.ColumnDefine {
+	for _, columnDefine := range ti.columnDefines {
+		if columnDefine.Name == columnName {
+			return columnDefine
+		}
+	}
+	return nil
 }
 
 func (ti *TableInfo) TableName() string {

@@ -33,7 +33,7 @@ func NewTree(pager *p.Pager, keySize uint8, valueSize uint8) (tree BPlusTree) {
 	order := uint16((util.PAGE_SIZE-1024)/uint16(keySize+valueSize)) / 2 * 2
 
 	rootNode := newNode(order)
-	rootPage := pager.NewPage(rootNode, 0)
+	rootPage := pager.NewPage(rootNode)
 	rootNode.Addr = rootPage.PageNum()
 	rootNode.Parent = 0
 	rootNode.PreLeaf = 0
@@ -210,7 +210,7 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
 	if node.Addr == tree.Root {
 		newRoot := newNode(tree.order)
-		rootPage := tree.pager.NewPage(newRoot, 0)
+		rootPage := tree.pager.NewPage(newRoot)
 		newRoot.Addr = rootPage.PageNum()
 		newRoot.Parent = 0
 		newRoot.Len = 0
@@ -225,7 +225,7 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 	}
 
 	newNode := newNode(tree.order)
-	newNodePage := tree.pager.NewPage(newNode, 0)
+	newNodePage := tree.pager.NewPage(newNode)
 	newNode.Addr = newNodePage.PageNum()
 	newNode.Parent = node.Parent
 
@@ -267,7 +267,7 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
 	if node.Addr == tree.Root {
 		newRoot := newNode(tree.order)
-		newRootPage := tree.pager.NewPage(newRoot, 0)
+		newRootPage := tree.pager.NewPage(newRoot)
 		newRoot.Addr = newRootPage.PageNum()
 		newRoot.Parent = 0
 		newRoot.isLeaf = false
@@ -280,7 +280,7 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 	}
 
 	newNode := newNode(tree.order)
-	newNodePage := tree.pager.NewPage(newNode, 0)
+	newNodePage := tree.pager.NewPage(newNode)
 	newNode.Addr = newNodePage.PageNum()
 
 	// 复制一半元素

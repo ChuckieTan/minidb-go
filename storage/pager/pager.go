@@ -1,6 +1,7 @@
 package pager
 
 import (
+	"fmt"
 	"io"
 	"minidb-go/storage/pager/pagedata"
 	"minidb-go/util"
@@ -70,22 +71,23 @@ func Open(path string) *Pager {
 }
 
 // 选择一个具有可用空间的 page
-func (pager *Pager) Select(spaceSize uint16, tableName string) (page *Page) {
+func (pager *Pager) Select(spaceSize uint16, tableName string) (page *Page, err error) {
 	if spaceSize > util.PAGE_SIZE {
-		return nil
+		return nil, fmt.Errorf("space size %d is too large", spaceSize)
 	}
 
 	metaData := pager.GetMetaData()
 
 	table := metaData.GetTableInfo(tableName)
-	page, err := pager.GetPage(table.LastPageNum(), pagedata.NewRecordData())
+	page, err = pager.GetPage(table.LastPageNum(), pagedata.NewRecordData())
 	if err != nil {
-		log.Fatalf("meta page error, table '%v' last data page not found", table.TableName())
+		err = fmt.Errorf("meta page error, table '%v' last data page not found", table.TableName())
+		return
 	}
 
 	if uint16(page.Size()) >= spaceSize {
 		// 如果 page 可用空间大于等于需要的空间，则直接返回
-		return page
+		return page, nil
 	} else {
 		// 如果 page 可用空间小于需要的空间，则需要分配新的 page
 		newDataPage := pager.NewPage(pagedata.NewRecordData())
@@ -93,7 +95,7 @@ func (pager *Pager) Select(spaceSize uint16, tableName string) (page *Page) {
 		newDataPage.prevPageNum = page.pageNum
 		page.nextPageNum = newDataPage.pageNum
 		table.SetLastPageNum(newDataPage.pageNum)
-		return newDataPage
+		return newDataPage, nil
 	}
 }
 

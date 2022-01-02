@@ -39,6 +39,10 @@ func (record *RecordData) Size() int {
 	return len(raw)
 }
 
+func (record *RecordData) Append(rows ast.Row) {
+	record.rows = append(record.rows, rows)
+}
+
 func (record *RecordData) PageDataType() PageDataType {
 	return RECORE_DATA
 }
