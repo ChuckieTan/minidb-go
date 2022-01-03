@@ -177,7 +177,7 @@ func (parser *Parser) ParseSelectStatement() (
 	}
 
 	if t := parser.lexer.GetCurrentToken(); parser.match(token.TT_IDENTIFIER) {
-		statement.TableSource = t.Val
+		statement.TableName = t.Val
 	} else {
 		err = fmt.Errorf("expected 'Identifier', found '%v'", t.Val)
 		log.Error(err.Error())
@@ -310,7 +310,7 @@ func (parser *Parser) parseWhere() (
 }
 
 func (parser *Parser) parseExpr() (
-	expr ast.SQLExpr, err error,
+	expr *ast.SQLExpr, err error,
 ) {
 	expr.Left, err = parser.parseExprValue()
 	if err != nil {
@@ -344,9 +344,9 @@ func (parse *Parser) parseExprValue() (
 func (parse *Parser) parseComparisonOperator() (
 	resType token.TokenType, err error) {
 	if resToken := parse.lexer.GetCurrentToken(); parse.tree(
-		token.TT_LESS, token.TT_LESS_OR_EQUAL, token.TT_ASSIGN,
+		token.TT_LESS, token.TT_LESS_EQUAL, token.TT_ASSIGN,
 		token.TT_EQUAL, token.TT_NOT_EQUAL, token.TT_GREATER,
-		token.TT_GREATER_OR_EQUAL) {
+		token.TT_GREATER_EQUAL) {
 		return resToken.Type, nil
 	} else {
 		err = fmt.Errorf("expected 'comparison operator, found '%v'", resToken.Val)

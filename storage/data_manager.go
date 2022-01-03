@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"minidb-go/parser/ast"
+	"minidb-go/parser/token"
 	"minidb-go/storage/index"
 	"minidb-go/storage/pager"
 	"minidb-go/storage/pager/pagedata"
@@ -29,7 +30,6 @@ type DataManager struct {
 
 func Create(path string) *DataManager {
 	pager := pager.Create(path)
-	// metaPage := pager.GetMetaPage()
 	dm := &DataManager{
 		pager: pager,
 	}
@@ -57,10 +57,10 @@ func (dm *DataManager) SelectData(selectStatement *ast.SelectStatement) (
 	rows := make(chan ast.Row, 64)
 	metaData := dm.pager.GetMetaData()
 	// 获取表信息
-	tableInfo := metaData.GetTableInfo(selectStatement.TableSource)
+	tableInfo := metaData.GetTableInfo(selectStatement.TableName)
 	if tableInfo == nil {
 		close(rows)
-		err := fmt.Errorf("table %s not exist", selectStatement.TableSource)
+		err := fmt.Errorf("table %s not exist", selectStatement.TableName)
 		return rows, err
 	}
 
@@ -76,20 +76,92 @@ func (dm *DataManager) SelectData(selectStatement *ast.SelectStatement) (
 		}
 	} else {
 		// 没有 where 条件，全表扫描
-		dm.fullScan(rows, tableInfo, whereToFunc(selectStatement.Where.Expr))
+		dm.fullScan(rows, tableInfo, selectStatement.Where.Expr)
 	}
 	return rows, nil
 }
 
-func whereToFunc(expr ast.SQLExpr) func(ast.Row) bool {
-	panic("implement me")
-	return func(row ast.Row) bool {
-		return false
+func whereToFunc(tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) (func(row ast.Row) bool, error) {
+	if expr == nil {
+		return func(row ast.Row) bool {
+			return true
+		}, nil
+	}
+	if expr.Left.ValueType() == ast.SQL_COLUMN && expr.Right.ValueType() == ast.SQL_COLUMN {
+		// 两个都是列名
+		columnNameL := string(expr.Left.(ast.SQLColumn))
+		columnNameR := string(expr.Right.(ast.SQLColumn))
+		columnDefines := tableInfo.ColumnDefines()
+		indexL, indexR := -1, -1
+		for i, columnDefine := range columnDefines {
+			if columnDefine.Name == columnNameL {
+				indexL = i
+			}
+			if columnDefine.Name == columnNameR {
+				indexR = i
+			}
+		}
+		if indexL == -1 {
+			return nil, fmt.Errorf("column %s not exist", columnNameL)
+		}
+		if indexR == -1 {
+			return nil, fmt.Errorf("column %s not exist", columnNameR)
+		}
+		switch expr.Op {
+		case token.TT_EQUAL:
+			return func(row ast.Row) bool {
+				return row[indexL] == row[indexR]
+			}, nil
+		case token.TT_NOT_EQUAL:
+			return func(row ast.Row) bool {
+				return row[indexL] != row[indexR]
+			}, nil
+		// TODO: 大于小于比较
+		default:
+			return nil, fmt.Errorf("operator %v not support", expr.Op)
+		}
+	} else if expr.Left.ValueType() == ast.SQL_COLUMN {
+		columnIndex := -1
+		for i, columnDefine := range tableInfo.ColumnDefines() {
+			if columnDefine.Name == string(expr.Left.(ast.SQLColumn)) {
+				columnIndex = i
+				break
+			}
+		}
+		if columnIndex == -1 {
+			return nil, fmt.Errorf("column %s not exist", expr.Left.(ast.SQLColumn))
+		}
+		switch expr.Op {
+		case token.TT_EQUAL:
+			return func(row ast.Row) bool {
+				return row[columnIndex] == expr.Right
+			}, nil
+		case token.TT_NOT_EQUAL:
+			return func(row ast.Row) bool {
+				return row[columnIndex] != expr.Right
+			}, nil
+		default:
+			return nil, fmt.Errorf("operator %v not support", expr.Op)
+		}
+	} else {
+		// 两边都是常量，直接比较
+		switch expr.Op {
+		case token.TT_EQUAL:
+			return func(row ast.Row) bool {
+				return expr.Left == expr.Right
+			}, nil
+		case token.TT_NOT_EQUAL:
+			return func(row ast.Row) bool {
+				return expr.Left != expr.Right
+			}, nil
+		default:
+			return nil, fmt.Errorf("operator %v not support", expr.Op)
+		}
 	}
 }
 
 func (dm *DataManager) equalSearch(rows chan<- ast.Row, tableInfo *pagedata.TableInfo,
-	expr ast.SQLExpr, value ast.SQLExprValue) {
+	expr *ast.SQLExpr, value ast.SQLExprValue) {
 	if expr.Left.ValueType() == ast.SQL_COLUMN {
 		// 查询索引
 		columnName := string(expr.Left.(ast.SQLColumn))
@@ -103,7 +175,7 @@ func (dm *DataManager) equalSearch(rows chan<- ast.Row, tableInfo *pagedata.Tabl
 		if index == nil {
 			// 没有索引，全表扫描
 			log.Warnf("index %s not exist, full scan table", expr.Left.(ast.SQLColumn))
-			dm.fullScan(rows, tableInfo, whereToFunc(expr))
+			dm.fullScan(rows, tableInfo, expr)
 			return
 		}
 		if columnName == tableInfo.PrimaryKey() {
@@ -130,7 +202,7 @@ func (dm *DataManager) equalSearch(rows chan<- ast.Row, tableInfo *pagedata.Tabl
 	} else {
 		if expr.Left == expr.Right {
 			log.Warnf("full scan table")
-			dm.fullScan(rows, tableInfo, whereToFunc(expr))
+			dm.fullScan(rows, tableInfo, expr)
 			return
 		} else {
 			// 左值和右值不相等，结果为空
@@ -149,7 +221,9 @@ func (dm *DataManager) primaryKeyEqualSearch(rows chan<- ast.Row, primaryIndex i
 			defer w.Done()
 			for pageNumBytes := range valueChan {
 				pageNum := util.BytesToUUID(pageNumBytes)
-				dm.traverseData(rows, pageNum, value)
+				dm.traverseData(rows, pageNum, func(row ast.Row) bool {
+					return row[0] == value
+				})
 			}
 		}()
 	}
@@ -157,7 +231,6 @@ func (dm *DataManager) primaryKeyEqualSearch(rows chan<- ast.Row, primaryIndex i
 		w.Wait()
 		close(rows)
 	}()
-	return
 }
 
 // 非主键索引相等查找
@@ -175,7 +248,9 @@ func (dm *DataManager) simpleEqualSearch(rows chan<- ast.Row, simpleIndex index.
 				pageNumChan := primaryIndex.Search(index.KeyType(primaryKeyBytes))
 				for pageNumBytes := range pageNumChan {
 					pageNum := util.BytesToUUID(pageNumBytes)
-					dm.traverseData(rows, pageNum, value)
+					dm.traverseData(rows, pageNum, func(row ast.Row) bool {
+						return row[0] == value
+					})
 				}
 			}
 		}()
@@ -184,23 +259,41 @@ func (dm *DataManager) simpleEqualSearch(rows chan<- ast.Row, simpleIndex index.
 		w.Wait()
 		close(rows)
 	}()
-	return
 }
 
-func (dm *DataManager) fullScan(rows chan<- ast.Row, tableInfo *pagedata.TableInfo, check func(ast.Row) bool) {
-
+// 扫描指定表的全部数据，自动关闭 rows
+func (dm *DataManager) fullScan(rows chan<- ast.Row, tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) {
+	// TODO: 双线程扫描
+	check, err := whereToFunc(tableInfo, expr)
+	if err != nil {
+		close(rows)
+		log.Errorf("whereToFunc failed: %v", err)
+		return
+	}
+	pageNum := tableInfo.FirstPageNum()
+	for pageNum != 0 {
+		dm.traverseData(rows, pageNum, check)
+		var err error
+		pageNum, err = dm.pager.NextPageNum(pageNum)
+		if err != nil {
+			log.Errorf("fatal error: %s", err)
+			return
+		}
+	}
+	close(rows)
 }
 
-// 遍历数据页，查找符合条件的数据
-func (dm *DataManager) traverseData(rows chan<- ast.Row, pageNum util.UUID, primaryKey ast.SQLExprValue) {
+// 遍历数据页，查找符合条件的数据，不负责关闭 rows
+func (dm *DataManager) traverseData(rows chan<- ast.Row, pageNum util.UUID, check func(ast.Row) bool) {
 	recordData := dm.getRecordData(pageNum)
 	for _, row := range recordData.Rows() {
-		if row[0] == primaryKey {
+		if check(row) {
 			rows <- row
 		}
 	}
 }
 
+// 插入数据
 func (dm *DataManager) InsertData(insertStatement *ast.InsertIntoStatement) {
 	metaData := dm.pager.GetMetaData()
 	tableInfo := metaData.GetTableInfo(insertStatement.TableName)
@@ -209,7 +302,7 @@ func (dm *DataManager) InsertData(insertStatement *ast.InsertIntoStatement) {
 		return
 	}
 	// TODO: 检查字段是否存在
-	dataPage, err := dm.pager.Select(insertStatement.Row.Len(), insertStatement.TableName)
+	dataPage, err := dm.pager.Select(insertStatement.Row.Size(), insertStatement.TableName)
 	if err != nil {
 		log.Errorf("table %s not exist", insertStatement.TableName)
 		return
@@ -218,7 +311,18 @@ func (dm *DataManager) InsertData(insertStatement *ast.InsertIntoStatement) {
 	pageData := dataPage.Data().(*pagedata.RecordData)
 	pageData.Append(insertStatement.Row)
 
-	// for _, columnDefine := range tableInfo.ColumnDefines() {
-	// 	index := columnDefine.Index
-	// }
+	for i, columnDefine := range tableInfo.ColumnDefines() {
+		index := columnDefine.Index
+		if index == nil {
+			continue
+		}
+		// 更新索引
+		if i == 0 {
+			// 主键索引
+			index.Insert(insertStatement.Row[i].Raw(), util.UUIDToBytes(index.ValueSize(), dataPage.PageNum()))
+		} else {
+			// 非主键索引
+			index.Insert(insertStatement.Row[i].Raw(), insertStatement.Row[0].Raw())
+		}
+	}
 }

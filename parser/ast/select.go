@@ -6,9 +6,9 @@ import (
 )
 
 type SelectStatement struct {
-	ResultList  []string
-	TableSource string
-	Where       WhereStatement
+	ResultList []string
+	TableName  string
+	Where      WhereStatement
 }
 
 func (statement SelectStatement) StatementType() string {
@@ -17,7 +17,7 @@ func (statement SelectStatement) StatementType() string {
 
 type Row []SQLExprValue
 
-func (row Row) Len() uint16 {
+func (row Row) Size() uint16 {
 	buff := bytes.NewBuffer(make([]byte, 0))
 	encoder := gob.NewEncoder(buff)
 	encoder.Encode(row)

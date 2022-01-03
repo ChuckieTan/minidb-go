@@ -73,6 +73,17 @@ func (sqlColumn SQLColumn) Raw() []byte {
 	return raw
 }
 
+func (sqlInt SQLInt) CompareTo(other SQLExprValue) int {
+	if other.ValueType() == SQL_INT {
+		return int(sqlInt) - int(other.(SQLInt))
+	} else if other.ValueType() == SQL_FLOAT {
+		return int(float64(sqlInt) - float64(other.(SQLFloat)))
+	} else if other.ValueType() == SQL_TEXT {
+
+		return -1
+	}
+}
+
 type SQLExpr struct {
 	Left  SQLExprValue
 	Op    token.TokenType

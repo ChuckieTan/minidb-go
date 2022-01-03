@@ -99,6 +99,15 @@ func (pager *Pager) Select(spaceSize uint16, tableName string) (page *Page, err 
 	}
 }
 
+func (pager *Pager) NextPageNum(pageNum util.UUID) (util.UUID, error) {
+	page, err := pager.GetPage(pageNum, pagedata.NewRecordData())
+	if err != nil {
+		err = fmt.Errorf("get page failed: %v", err)
+		return NIL_PAGE_NUM, err
+	}
+	return page.nextPageNum, nil
+}
+
 func (pager *Pager) NewPage(pageData pagedata.PageData) *Page {
 	fileSize, err := pager.file.Seek(0, os.SEEK_END)
 	if err != nil {

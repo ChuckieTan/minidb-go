@@ -19,32 +19,32 @@ const (
 	TT_AND
 	TT_OR
 	TT_NOT
-	TT_IDENTIFIER       // identifier
-	TT_COMMA            //
-	TT_STAR             // *
-	TT_LBRACKET         // (
-	TT_RBRACKET         // )
-	TT_IN               // in
-	TT_IF               // if
-	TT_EXISTS           // exists
-	TT_IS               // is
-	TT_NULL_            // null
-	TT_TRUE             // true
-	TT_FALSE            // false
-	TT_EQUAL            // ==
-	TT_NOT_EQUAL        // '!=' <>
-	TT_LESS             // <
-	TT_LESS_OR_EQUAL    // <=
-	TT_GREATER          // >
-	TT_GREATER_OR_EQUAL // >=
-	TT_PLUS             // +
-	TT_MINUS            // -
-	TT_INTEGER          // integer number
-	TT_FLOAT            // float number
-	TT_STRING           // string.
-	TT_SEMICOLON        // ;
-	TT_ILLEGAL          // illegal token
-	TT_END              // end of SQL
+	TT_IDENTIFIER    // identifier
+	TT_COMMA         //
+	TT_STAR          // *
+	TT_LBRACKET      // (
+	TT_RBRACKET      // )
+	TT_IN            // in
+	TT_IF            // if
+	TT_EXISTS        // exists
+	TT_IS            // is
+	TT_NULL_         // null
+	TT_TRUE          // true
+	TT_FALSE         // false
+	TT_EQUAL         // ==
+	TT_NOT_EQUAL     // '!=' <>
+	TT_LESS          // <
+	TT_LESS_EQUAL    // <=
+	TT_GREATER       // >
+	TT_GREATER_EQUAL // >=
+	TT_PLUS          // +
+	TT_MINUS         // -
+	TT_INTEGER       // integer number
+	TT_FLOAT         // float number
+	TT_STRING        // string.
+	TT_SEMICOLON     // ;
+	TT_ILLEGAL       // illegal token
+	TT_END           // end of SQL
 
 	TT_DOT      // .
 	TT_BETWEEN  // between
