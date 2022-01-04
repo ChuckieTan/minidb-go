@@ -2,14 +2,13 @@ package pager
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"minidb-go/storage/pager/pagedata"
 	"minidb-go/transaction"
 	"minidb-go/util"
 	"minidb-go/util/byteconv"
 	"sync"
-
-	log "github.com/sirupsen/logrus"
 )
 
 type PageType uint8
@@ -60,33 +59,33 @@ func LoadPage(r io.Reader, pageData pagedata.PageData) (*Page, error) {
 	page := &Page{}
 	err := byteconv.Decode(r, &page.pageNum)
 	if err != nil {
-		log.Errorf("decode page num failed: %v", err)
+		err = fmt.Errorf("decode page num failed: %v", err)
 		return nil, err
 	}
 	err = byteconv.Decode(r, &page.pageType)
 	if err != nil {
-		log.Errorf("decode page type failed: %v", err)
+		err = fmt.Errorf("decode page type failed: %v", err)
 		return nil, err
 	}
 	err = byteconv.Decode(r, &page.nextPageNum)
 	if err != nil {
-		log.Errorf("decode next page num failed: %v", err)
+		err = fmt.Errorf("decode next page num failed: %v", err)
 		return nil, err
 	}
 	err = byteconv.Decode(r, &page.prevPageNum)
 	if err != nil {
-		log.Errorf("decode prev page num failed: %v", err)
+		err = fmt.Errorf("decode prev page num failed: %v", err)
 		return nil, err
 	}
 	err = byteconv.Decode(r, &page.dirty)
 	if err != nil {
-		log.Errorf("decode dirty flag failed: %v", err)
+		err = fmt.Errorf("decode dirty flag failed: %v", err)
 		return nil, err
 	}
 	var dataLen uint16
 	err = byteconv.Decode(r, &dataLen)
 	if err != nil {
-		log.Errorf("decode data length failed: %v", err)
+		err = fmt.Errorf("decode data length failed: %v", err)
 		return nil, err
 	}
 	page.data = pageData

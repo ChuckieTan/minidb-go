@@ -25,29 +25,47 @@ func NewParser(sql string) (parser Parser, err error) {
 func (parser *Parser) ParseStatement() (
 	statement ast.SQLStatement, err error,
 ) {
-	switch parser.lexer.GetCurrentToken().Type {
-	case token.TT_CREATE:
+	savePoint := parser.lexer.mark()
+	if parser.chain(token.TT_CREATE, token.TT_TABLE) {
 		statement, err = parser.ParseCreateTableStatement()
-	case token.TT_SELECT:
-		statement, err = parser.ParseSelectStatement()
-	case token.TT_INSERT:
-		statement, err = parser.ParseInsertIntoStatement()
-	case token.TT_UPDATE:
-		statement, err = parser.ParseUpdateStatement()
-	case token.TT_DELETE:
-		statement, err = parser.ParseDeleteStatement()
+		return
 	}
-	return statement, err
+
+	parser.lexer.reset(savePoint)
+	if parser.chain(token.TT_INSERT, token.TT_INTO) {
+		statement, err = parser.ParseInsertIntoStatement()
+		return
+	}
+
+	parser.lexer.reset(savePoint)
+	if parser.chain(token.TT_UPDATE) {
+		statement, err = parser.ParseUpdateStatement()
+		return
+	}
+
+	parser.lexer.reset(savePoint)
+	if parser.chain(token.TT_DELETE, token.TT_FROM) {
+		statement, err = parser.ParseDeleteStatement()
+		return
+	}
+
+	if parser.chain(token.TT_SELECT) {
+		statement, err = parser.ParseSelectStatement()
+		return
+	}
+	err = fmt.Errorf("expected a statement")
+	return
+}
+
+func (parser *Parser) parseCreateIndexStatement() (
+	statement ast.SQLStatement, err error,
+) {
+	return
 }
 
 func (parser *Parser) ParseCreateTableStatement() (
 	statement ast.CreateTableStatement, err error,
 ) {
-	if !parser.chain(token.TT_CREATE, token.TT_TABLE) {
-		err = fmt.Errorf("not a create table statement")
-		log.Error(err.Error())
-		return statement, err
-	}
 	statement.TableName, err = parser.parseTableName()
 	if err != nil {
 		return statement, err
@@ -112,11 +130,6 @@ func (parser *Parser) ParseInsertIntoStatement() (
 	statement ast.InsertIntoStatement,
 	err error,
 ) {
-	if !parser.chain(token.TT_INSERT, token.TT_INTO) {
-		err = fmt.Errorf("not a create table statement")
-		log.Error(err.Error())
-		return
-	}
 	if t := parser.lexer.GetNextToken(); t.Type == token.TT_IDENTIFIER {
 		statement.TableName = t.Val
 	} else {
@@ -151,11 +164,6 @@ func (parser *Parser) ParseSelectStatement() (
 	statement ast.SelectStatement,
 	err error,
 ) {
-	if !parser.match(token.TT_SELECT) {
-		err = fmt.Errorf("not a select statement")
-		log.Error(err.Error())
-		return
-	}
 	if parser.match(token.TT_STAR) {
 		statement.ResultList = append(statement.ResultList, "*")
 	} else {
@@ -204,11 +212,6 @@ func (parser *Parser) ParseSelectStatement() (
 
 func (parser *Parser) ParseUpdateStatement() (
 	statement ast.UpdateStatement, err error) {
-	if !parser.match(token.TT_UPDATE) {
-		err = fmt.Errorf("not a update statement")
-		return
-	}
-
 	statement.TableSource, err = parser.parseTableName()
 	if err != nil {
 		return
@@ -251,12 +254,6 @@ func (parser *Parser) ParseUpdateStatement() (
 func (parser *Parser) ParseDeleteStatement() (
 	statement ast.DeleteStatement, err error,
 ) {
-	if !parser.chain(token.TT_DELETE, token.TT_FROM) {
-		err = fmt.Errorf("not a delete statement")
-		log.Error(err.Error())
-		return
-	}
-
 	statement.TableSource, err = parser.parseTableName()
 	if err != nil {
 		return
