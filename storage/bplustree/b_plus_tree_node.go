@@ -91,7 +91,7 @@ func (node *BPlusTreeNode) Size() int {
 		keySize = int(node.Len) * len(node.Keys[0])
 		ValueSize = int(node.Len+1) * len(node.Values[0])
 	}
-	return 4 + 4 + 4 + 2 + keySize + ValueSize + 1 + 2
+	return 4 + 4 + 4 + 4 + 2 + keySize + ValueSize + 1 + 2
 }
 
 func (node *BPlusTreeNode) PageDataType() pagedata.PageDataType {

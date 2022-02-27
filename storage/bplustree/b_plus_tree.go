@@ -47,6 +47,7 @@ func NewTree(pager *p.Pager, keySize uint8, valueSize uint8) (tree BPlusTree) {
 	tree.order = order
 	tree.keySize = keySize
 	tree.valueSize = valueSize
+	tree.pager = pager
 
 	rootNode.Keys = make([]index.KeyType, order)
 	rootNode.Values = make([]index.ValueType, order+1)
@@ -228,6 +229,11 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 	newNodePage := tree.pager.NewPage(newNode)
 	newNode.Addr = newNodePage.PageNum()
 	newNode.Parent = node.Parent
+
+	// 更新树的最后一个节点
+	if tree.LastLeaf == node.Addr {
+		tree.LastLeaf = newNode.Addr
+	}
 
 	order := tree.order
 	// 复制一半元素

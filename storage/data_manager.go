@@ -26,6 +26,8 @@ var (
 
 type DataManager struct {
 	pager *pager.Pager
+
+	//TODO: Data Cache，自适应哈希索引
 }
 
 func Create(path string) *DataManager {
@@ -81,13 +83,17 @@ func (dm *DataManager) SelectData(selectStatement *ast.SelectStatement) (
 	return rows, nil
 }
 
-func whereToFunc(tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) (func(row ast.Row) bool, error) {
+// 把 where 转换成一个函数，返回值为 bool，表示是否符合条件
+func whereToFunc(tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) (
+	func(row ast.Row) bool, error,
+) {
 	if expr == nil {
 		return func(row ast.Row) bool {
 			return true
 		}, nil
 	}
-	if expr.Left.ValueType() == ast.SQL_COLUMN && expr.Right.ValueType() == ast.SQL_COLUMN {
+	if expr.Left.ValueType() == ast.SQL_COLUMN &&
+		expr.Right.ValueType() == ast.SQL_COLUMN {
 		// 两个都是列名
 		columnNameL := string(expr.Left.(ast.SQLColumn))
 		columnNameR := string(expr.Right.(ast.SQLColumn))

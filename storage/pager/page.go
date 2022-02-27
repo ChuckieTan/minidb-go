@@ -29,8 +29,6 @@ type Page struct {
 	nextPageNum util.UUID
 	prevPageNum util.UUID
 
-	pageType PageType
-
 	dirty bool
 
 	data     pagedata.PageData
@@ -60,11 +58,6 @@ func LoadPage(r io.Reader, pageData pagedata.PageData) (*Page, error) {
 	err := byteconv.Decode(r, &page.pageNum)
 	if err != nil {
 		err = fmt.Errorf("decode page num failed: %v", err)
-		return nil, err
-	}
-	err = byteconv.Decode(r, &page.pageType)
-	if err != nil {
-		err = fmt.Errorf("decode page type failed: %v", err)
 		return nil, err
 	}
 	err = byteconv.Decode(r, &page.nextPageNum)
@@ -103,7 +96,6 @@ func (p *Page) PageNum() util.UUID {
 func (page *Page) Raw() []byte {
 	buff := bytes.NewBuffer(make([]byte, util.PAGE_SIZE))
 	byteconv.Encode(buff, page.pageNum)
-	byteconv.Encode(buff, page.pageType)
 	byteconv.Encode(buff, page.nextPageNum)
 	byteconv.Encode(buff, page.prevPageNum)
 	byteconv.Encode(buff, page.dirty)
