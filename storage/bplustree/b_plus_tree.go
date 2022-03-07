@@ -6,6 +6,7 @@ import (
 	"minidb-go/storage/index"
 	p "minidb-go/storage/pager"
 	"minidb-go/util"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -21,6 +22,8 @@ type BPlusTree struct {
 	valueSize uint8
 
 	pager *p.Pager
+
+	lock sync.RWMutex
 }
 
 // pager: 分页器
@@ -54,27 +57,61 @@ func NewTree(pager *p.Pager, keySize uint8, valueSize uint8) (tree BPlusTree) {
 	return
 }
 
+func (tree *BPlusTree) RLock() {
+	tree.lock.RLock()
+}
+
+func (tree *BPlusTree) RUnlock() {
+	tree.lock.RUnlock()
+}
+
+func (tree *BPlusTree) Lock() {
+	tree.lock.Lock()
+}
+
+func (tree *BPlusTree) Unlock() {
+	tree.lock.Unlock()
+}
+
 func (tree *BPlusTree) Order() uint16 {
+	tree.RLock()
+	defer tree.RUnlock()
+
 	return tree.order
 }
 
 func (tree *BPlusTree) SetOrder(order uint16) {
+	tree.Lock()
+	defer tree.Unlock()
+
 	tree.order = order
 }
 
 func (tree *BPlusTree) KeySize() uint8 {
+	tree.RLock()
+	defer tree.RUnlock()
+
 	return tree.keySize
 }
 
 func (tree *BPlusTree) ValueSize() uint8 {
+	tree.RLock()
+	defer tree.RUnlock()
+
 	return tree.valueSize
 }
 
 func (tree *BPlusTree) SetKeySize(keySize uint8) {
+	tree.Lock()
+	defer tree.Unlock()
+
 	tree.keySize = keySize
 }
 
 func (tree *BPlusTree) SetValueSize(valueSize uint8) {
+	tree.Lock()
+	defer tree.Unlock()
+
 	tree.valueSize = valueSize
 }
 
@@ -137,6 +174,9 @@ func (tree *BPlusTree) searchUpperInTree(key index.KeyType) (*BPlusTreeNode, uin
 }
 
 func (tree *BPlusTree) Search(key index.KeyType) <-chan index.ValueType {
+	tree.RLock()
+	defer tree.RUnlock()
+
 	valueChan := make(chan index.ValueType, 64)
 
 	node, index := tree.searchLowerInTree(key)
@@ -187,6 +227,8 @@ func (tree *BPlusTree) Search(key index.KeyType) <-chan index.ValueType {
 // key: 主键
 // value: 值
 func (tree *BPlusTree) Insert(key index.KeyType, value index.ValueType) error {
+	tree.RLock()
+	defer tree.RUnlock()
 	// 如果已经存在相同的 (key, value), 则直接返回
 	valueChan := tree.Search(key)
 	for treeValue := range valueChan {
@@ -195,6 +237,9 @@ func (tree *BPlusTree) Insert(key index.KeyType, value index.ValueType) error {
 		}
 	}
 	node, _ := tree.searchLowerInTree(key)
+
+	tree.Lock()
+	defer tree.Unlock()
 	// TODO: 新插入的 value 需要放在最后一个位置
 	ok := node.insertEntry(key, value)
 	if !ok {
