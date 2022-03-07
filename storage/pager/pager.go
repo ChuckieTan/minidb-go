@@ -29,8 +29,8 @@ func Create(path string) *Pager {
 
 	pager.cache = lru.NewLRU(16)
 	pager.cache.SetEviction(func(key, value interface{}) {
-		page := value.(*Page)
-		pager.Flush(page)
+		// page := value.(*Page)
+
 	})
 	// 初始化 meta page
 	metaData := pagedata.NewMetaData()
@@ -52,8 +52,8 @@ func Open(path string) *Pager {
 
 	pager.cache = lru.NewLRU(16)
 	pager.cache.SetEviction(func(key, value interface{}) {
-		page := value.(*Page)
-		pager.Flush(page)
+		// page := value.(*Page)
+		// pager.Flush(page)
 	})
 
 	metaPage, err := pager.GetPage(0, pagedata.NewMetaData())
@@ -64,11 +64,6 @@ func Open(path string) *Pager {
 	if metaData.Version() != util.VERSION {
 		log.Fatalf("version not match")
 	}
-	if !metaData.Valid() {
-		// TODO: checksum 不匹配时，需要重新恢复数据
-		log.Fatalf("checksum not match")
-	}
-
 	return pager
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"minidb-go/storage/pager/pagedata"
+	"minidb-go/storage/recovery/redo"
 	"minidb-go/transaction"
 	"minidb-go/util"
 	"minidb-go/util/byteconv"
@@ -27,10 +28,12 @@ const (
 type Page struct {
 	pageNum util.UUID
 
-	LSN util.UUID
+	LSN int64
 
 	nextPageNum util.UUID
 	prevPageNum util.UUID
+
+	logs []*redo.Log
 
 	data     pagedata.PageData
 	dataCopy pagedata.PageData
@@ -56,6 +59,11 @@ func LoadPage(r io.Reader, pageData pagedata.PageData) (*Page, error) {
 	err := byteconv.Decode(r, &page.pageNum)
 	if err != nil {
 		err = fmt.Errorf("decode page num failed: %v", err)
+		return nil, err
+	}
+	err = byteconv.Decode(r, &page.LSN)
+	if err != nil {
+		err = fmt.Errorf("decode LSN failed: %v", err)
 		return nil, err
 	}
 	err = byteconv.Decode(r, &page.nextPageNum)
@@ -93,11 +101,20 @@ func (p *Page) PageNum() util.UUID {
 func (page *Page) Raw() []byte {
 	buff := bytes.NewBuffer(make([]byte, util.PAGE_SIZE))
 	byteconv.Encode(buff, page.pageNum)
+	byteconv.Encode(buff, page.LSN)
 	byteconv.Encode(buff, page.nextPageNum)
 	byteconv.Encode(buff, page.prevPageNum)
 	dataByte := page.data.Encode()
 	buff.Write(dataByte)
 	return buff.Bytes()
+}
+
+func (page *Page) Logs() []*redo.Log {
+	return page.logs
+}
+
+func (page *Page) AppendLog(log *redo.Log) {
+	page.logs = append(page.logs, log)
 }
 
 // 以共享的方式返回 Page 的数据

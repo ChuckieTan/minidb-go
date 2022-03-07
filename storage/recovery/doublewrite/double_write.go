@@ -3,7 +3,6 @@ Double Write Bbuffer 用于保证单个页的完整性，以便 redo log 可以�
 Double Write Buffer 的结构如下：
 inmemory:
 	pages: map[pageNum]page
-	bufferFile: file
 
 ondisk:
 	bufferFile: 用于缓存 inmemory 中的数据，每次写入时，
@@ -14,11 +13,18 @@ package doublewrite
 
 import (
 	"bytes"
+	"minidb-go/storage/pager"
 	"minidb-go/util"
 	"os"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
+)
+
+var EMPTY_BUFFER = make([]byte, util.PAGE_SIZE*util.DOUBLE_WRITE_POOL_PAGE_NUM)
+
+const (
+	DOUBLE_WRITE_BUFF_FILE_NAME = "double_write.buf"
 )
 
 type DoubleWrite struct {
@@ -31,10 +37,12 @@ type DoubleWrite struct {
 	bufferFile *os.File
 	// double write 不负责关闭 page file
 	pageFile *os.File
+
+	SetCheckPoint func(checkPoint int64) error
 }
 
 func Open(path string, pageFile *os.File) *DoubleWrite {
-	path = path + "/double_write.db"
+	path = path + "/" + DOUBLE_WRITE_BUFF_FILE_NAME
 	file, err := os.OpenFile(path, os.O_RDWR, 0666)
 	if err != nil {
 		log.Fatalf("open double write file %s failed: %v", path, err)
@@ -48,13 +56,19 @@ func Open(path string, pageFile *os.File) *DoubleWrite {
 }
 
 func Create(path string, pageFile *os.File) *DoubleWrite {
-	path = path + "/double_write.db"
+	path = path + "/" + DOUBLE_WRITE_BUFF_FILE_NAME
+
+	// 判断文件是否存在
+	stat, err := os.Stat(path)
+	if err == nil && stat.Size() != 0 {
+		log.Fatalf("double write file %s already exists", path)
+	}
+
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		log.Fatalf("open double write file %s failed: %v", path, err)
 	}
-	initData := make([]byte, util.PAGE_SIZE*util.DOUBLE_WRITE_POOL_PAGE_NUM)
-	file.Write(initData)
+	file.Write(EMPTY_BUFFER)
 	return &DoubleWrite{
 		pages:      make(map[util.UUID][]byte),
 		bufferFile: file,
@@ -63,41 +77,33 @@ func Create(path string, pageFile *os.File) *DoubleWrite {
 }
 
 // 将页文件恢复到所有页均未损坏的状态，使之可以被 redo log 恢复
-func Recover(path string, pageFile *os.File) {
-	path = path + "/double_write.db"
-	file, err := os.OpenFile(path, os.O_RDWR, 0666)
-	if err != nil {
-		log.Fatalf("open double write file %s failed: %v", path, err)
-	}
+func (dw *DoubleWrite) Recover() {
+	dw.bufferFile.Seek(0, 0)
 
-	// 先将 buffer 中的数据写入磁盘
-	file.Seek(0, 0)
+	page := make([]byte, util.PAGE_SIZE)
+	EMPTY_PAGE := make([]byte, util.PAGE_SIZE)
 	for {
-		page := make([]byte, util.PAGE_SIZE)
-		n, err := file.Read(page)
-		if err != nil {
+		n, err := dw.bufferFile.Read(page)
+		if n < util.PAGE_SIZE || err != nil {
 			break
 		}
-		if n != util.PAGE_SIZE {
-			log.Fatalf("read double write file %s failed: %v", path, err)
-		}
 		// 如果读入的数据全为 0，则该页后面的数据都是 0
-		if bytes.Equal(page, make([]byte, util.PAGE_SIZE)) {
+		if bytes.Equal(page, EMPTY_PAGE) {
 			break
 		}
 		// 如果 checkeSum 校验失败，说明在该页处写入 buffer 时发生了非正常退出，
 		// 则当前页所对应的数据文件中的 page 一定是完好的，
 		// 因为在写入时，是先将脏页写入磁盘中的 buffer，然后再将 buffer 写入磁盘中的 page
-		if !IsValid(page) {
+		if !IsPartialWrite(page) {
 			break
 		}
 		pageNum := util.BytesToUUID(page[:4])
-		pageFile.Seek(int64(pageNum*util.PAGE_SIZE), 0)
-		pageFile.Write(page)
+		dw.pageFile.Seek(int64(pageNum*util.PAGE_SIZE), 0)
+		dw.pageFile.Write(page)
 	}
 }
 
-// 将内存中的数据写入磁盘
+// 将内存中的数据写入磁盘，并且刷新 CheckPoint
 func (dw *DoubleWrite) FlushToDisk() {
 	// 分配一个 pages 的副本，并清空原 pages
 	dw.memoryLock.Lock()
@@ -113,33 +119,52 @@ func (dw *DoubleWrite) FlushToDisk() {
 	}
 
 	// 然后再将脏页写入磁盘中的 page
-	for pageNum, page_bytes := range pages {
+	maxLSN := int64(0)
+	for pageNum, pageBytes := range pages {
 		dw.pageFile.Seek(int64(pageNum*util.PAGE_SIZE), 0)
-		dw.pageFile.Write(page_bytes)
+		dw.pageFile.Write(pageBytes)
+		if getLSN(pageBytes) > maxLSN {
+			maxLSN = getLSN(pageBytes)
+		}
 	}
 
 	// 最后需要将 buffer 清空
 	dw.bufferFile.Seek(0, 0)
-	dw.bufferFile.Write(make([]byte, util.PAGE_SIZE*util.DOUBLE_WRITE_POOL_PAGE_NUM))
+	dw.bufferFile.Write(EMPTY_BUFFER)
 
 	dw.diskLock.Unlock()
 
-	// TODO: 刷新 checkpoint
+	if dw.SetCheckPoint != nil {
+		dw.SetCheckPoint(maxLSN)
+	}
 }
 
-func (dw *DoubleWrite) Write(pageNum util.UUID, page []byte) error {
+func getLSN(page []byte) int64 {
+	return util.BytesToInt64(page[4:12])
+}
+
+func (dw *DoubleWrite) Write(page *pager.Page) {
+	raw := page.Raw()
+	pageNum := page.PageNum()
+
 	dw.memoryLock.Lock()
 
 	// 写入 checkSum 到 page 末尾
-	pageCheckSum := CheckSum(page[:util.PAGE_SIZE-4])
-	copy(page[util.PAGE_SIZE-4:], pageCheckSum)
+	pageCheckSum := CheckSum(raw[:util.PAGE_SIZE-4])
+	copy(raw[util.PAGE_SIZE-4:], pageCheckSum)
 
-	dw.pages[pageNum] = page
+	dw.pages[pageNum] = raw
+
+	// 当写入的页数达到一定数量时，则将内存中的数据写入磁盘
+	// 默认为 75%
+	if len(dw.pages) >= util.DOUBLE_WRITE_POOL_PAGE_NUM*0.75 {
+		go dw.FlushToDisk()
+	}
 
 	dw.memoryLock.Unlock()
-	return nil
 }
 
+// 将内存中的数据写入磁盘，关闭 DoubleWrite 文件，并且更新 LSN
 func (dw *DoubleWrite) Close() {
 	dw.FlushToDisk()
 	dw.bufferFile.Close()
@@ -163,6 +188,6 @@ func CheckSum(page []byte) []byte {
 	return sum
 }
 
-func IsValid(page []byte) bool {
+func IsPartialWrite(page []byte) bool {
 	return bytes.Equal(CheckSum(page[:util.PAGE_SIZE-4]), page[util.PAGE_SIZE-4:])
 }
