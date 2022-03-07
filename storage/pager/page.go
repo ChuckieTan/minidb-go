@@ -23,13 +23,14 @@ const (
 	NIL_PAGE_NUM util.UUID = util.UUID(1<<32 - 1)
 )
 
+// Page 本身不判断是否损坏（即checksum不匹配），判断部分写由 Double Write 完成。
 type Page struct {
 	pageNum util.UUID
 
+	LSN util.UUID
+
 	nextPageNum util.UUID
 	prevPageNum util.UUID
-
-	dirty bool
 
 	data     pagedata.PageData
 	dataCopy pagedata.PageData
@@ -37,9 +38,7 @@ type Page struct {
 	rwlock sync.RWMutex
 }
 
-func newPage(pageNum util.UUID,
-	pageData pagedata.PageData) *Page {
-
+func newPage(pageNum util.UUID, pageData pagedata.PageData) *Page {
 	return &Page{
 		pageNum: pageNum,
 
@@ -48,13 +47,12 @@ func newPage(pageNum util.UUID,
 
 		data:     pageData,
 		dataCopy: pageData,
-
-		dirty: true,
 	}
 }
 
 func LoadPage(r io.Reader, pageData pagedata.PageData) (*Page, error) {
 	page := &Page{}
+
 	err := byteconv.Decode(r, &page.pageNum)
 	if err != nil {
 		err = fmt.Errorf("decode page num failed: %v", err)
@@ -70,11 +68,6 @@ func LoadPage(r io.Reader, pageData pagedata.PageData) (*Page, error) {
 		err = fmt.Errorf("decode prev page num failed: %v", err)
 		return nil, err
 	}
-	err = byteconv.Decode(r, &page.dirty)
-	if err != nil {
-		err = fmt.Errorf("decode dirty flag failed: %v", err)
-		return nil, err
-	}
 	var dataLen uint16
 	err = byteconv.Decode(r, &dataLen)
 	if err != nil {
@@ -84,7 +77,11 @@ func LoadPage(r io.Reader, pageData pagedata.PageData) (*Page, error) {
 	page.data = pageData
 	page.data.Decode(r)
 	page.dataCopy = page.data
-	page.dirty = false
+
+	if err != nil {
+		return nil, err
+	}
+
 	return page, nil
 }
 
@@ -98,11 +95,8 @@ func (page *Page) Raw() []byte {
 	byteconv.Encode(buff, page.pageNum)
 	byteconv.Encode(buff, page.nextPageNum)
 	byteconv.Encode(buff, page.prevPageNum)
-	byteconv.Encode(buff, page.dirty)
 	dataByte := page.data.Encode()
 	buff.Write(dataByte)
-	zeroLen := util.PAGE_SIZE - len(buff.Bytes())
-	buff.Write(make([]byte, zeroLen))
 	return buff.Bytes()
 }
 
@@ -127,14 +121,6 @@ func (p *Page) SetPrevPageNum(pageNum util.UUID) {
 	p.nextPageNum = pageNum
 }
 
-func (p *Page) Dirty() bool {
-	return p.dirty
-}
-
-func (p *Page) SetDirty() {
-	p.dirty = true
-}
-
 func (p *Page) BeforeRead() (XID transaction.XID) {
 	p.rwlock.RLock()
 	util.DeepCopy(&p.dataCopy, &p.data)
@@ -147,7 +133,6 @@ func (p *Page) AfterRead() {
 
 func (p *Page) BeforeWrite() (XID transaction.XID) {
 	p.rwlock.Lock()
-	p.SetDirty()
 	util.DeepCopy(&p.dataCopy, &p.data)
 	return
 }

@@ -18,6 +18,7 @@ type Pager struct {
 }
 
 func Create(path string) *Pager {
+	path = path + "/data.db"
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		log.Fatalf("open file %s failed: %v", path, err)
@@ -40,6 +41,7 @@ func Create(path string) *Pager {
 }
 
 func Open(path string) *Pager {
+	path = path + "/data.db"
 	file, err := os.OpenFile(path, os.O_RDWR, 0666)
 	if err != nil {
 		log.Fatalf("open file %s failed: %v", path, err)
