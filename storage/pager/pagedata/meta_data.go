@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"io"
-	"math/rand"
 	"minidb-go/parser/ast"
 	"minidb-go/util"
 )
@@ -57,15 +56,8 @@ func (ti *TableInfo) SetLastPageNum(uuid util.UUID) {
 }
 
 type MetaData struct {
-	checksum     uint32
-	checksumCopy uint32
-
 	version string
 	tables  map[string]*TableInfo
-}
-
-func (md *MetaData) Valid() bool {
-	return md.checksum == md.checksumCopy
 }
 
 func (meta *MetaData) Version() string {
@@ -83,10 +75,8 @@ func (meta *MetaData) GetTableInfo(tableName string) *TableInfo {
 
 func NewMetaData() *MetaData {
 	return &MetaData{
-		checksum:     rand.Uint32(),
-		checksumCopy: 0,
-		version:      util.VERSION,
-		tables:       make(map[string]*TableInfo, 0),
+		version: util.VERSION,
+		tables:  make(map[string]*TableInfo, 0),
 	}
 }
 

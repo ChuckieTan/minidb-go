@@ -4,6 +4,14 @@ func BytesToUInt32(b []byte) uint32 {
 	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
 }
 
+func BytesToInt64(b []byte) int64 {
+	ans := int64(0)
+	for i := 0; i < 8; i++ {
+		ans = ans<<8 | int64(b[i])
+	}
+	return ans
+}
+
 func BytesToUUID(b []byte) UUID {
 	return UUID(BytesToUInt32(b))
 }

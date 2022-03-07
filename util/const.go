@@ -30,7 +30,7 @@ const (
 
 	// BPLUSTREE_ORDER is the order of B+Tree.
 
-	BPLUSTREE_KEY_LEN = 32
+	BPLUSTREE_KEY_LEN = 8
 
 	VERSION = "0.0.1"
 

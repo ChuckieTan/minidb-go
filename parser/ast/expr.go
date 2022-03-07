@@ -65,11 +65,11 @@ func (sqlFloat SQLFloat) Raw() []byte {
 	return raw
 }
 func (sqlText SQLText) Raw() []byte {
-	raw := []byte(sqlText)[:util.BPLUSTREE_KEY_LEN]
+	raw := []byte(sqlText)[:util.BPLUSTREE_KEY_LEN+1]
 	return raw
 }
 func (sqlColumn SQLColumn) Raw() []byte {
-	raw := []byte(sqlColumn)[:util.BPLUSTREE_KEY_LEN]
+	raw := []byte(sqlColumn)[:util.BPLUSTREE_KEY_LEN+1]
 	return raw
 }
 
