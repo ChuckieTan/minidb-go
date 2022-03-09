@@ -9,6 +9,7 @@ import (
 	"minidb-go/storage/pager/pagedata"
 	"minidb-go/util"
 	"sort"
+	"sync"
 )
 
 type BPlusTreeNode struct {
@@ -27,6 +28,8 @@ type BPlusTreeNode struct {
 
 	// 只在内存中使用，用于解码
 	tree *BPlusTree
+
+	lock sync.RWMutex
 }
 
 func newNode(order uint16) *BPlusTreeNode {
@@ -112,6 +115,22 @@ func (node *BPlusTreeNode) Tree() *BPlusTree {
 
 func (node *BPlusTreeNode) SetTree(tree *BPlusTree) {
 	node.tree = tree
+}
+
+func (node *BPlusTreeNode) RLock() {
+	node.lock.RLock()
+}
+
+func (node *BPlusTreeNode) RUnlock() {
+	node.lock.RUnlock()
+}
+
+func (node *BPlusTreeNode) Lock() {
+	node.lock.Lock()
+}
+
+func (node *BPlusTreeNode) Unlock() {
+	node.lock.Unlock()
 }
 
 func (node *BPlusTreeNode) Encode() []byte {

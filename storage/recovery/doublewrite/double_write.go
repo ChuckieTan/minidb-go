@@ -88,7 +88,7 @@ func (dw *DoubleWrite) Recover() {
 			break
 		}
 		// 如果读入的数据全为 0，则该页后面的数据都是 0
-		if bytes.Equal(page, EMPTY_PAGE) {
+		if bytes.Equal(page[:12], EMPTY_PAGE[:12]) {
 			break
 		}
 		// 如果 checkeSum 校验失败，说明在该页处写入 buffer 时发生了非正常退出，
@@ -113,9 +113,10 @@ func (dw *DoubleWrite) FlushToDisk() {
 
 	// 先将内存中的脏页写入磁盘中的 buffer
 	dw.diskLock.Lock()
+
 	dw.bufferFile.Seek(0, 0)
-	for _, page_bytes := range pages {
-		dw.bufferFile.Write(page_bytes)
+	for _, pageBytes := range pages {
+		dw.bufferFile.Write(pageBytes)
 	}
 
 	// 然后再将脏页写入磁盘中的 page
@@ -148,6 +149,7 @@ func (dw *DoubleWrite) Write(page *pager.Page) {
 	pageNum := page.PageNum()
 
 	dw.memoryLock.Lock()
+	defer dw.memoryLock.Unlock()
 
 	// 写入 checkSum 到 page 末尾
 	pageCheckSum := CheckSum(raw[:util.PAGE_SIZE-4])
@@ -160,8 +162,6 @@ func (dw *DoubleWrite) Write(page *pager.Page) {
 	if len(dw.pages) >= util.DOUBLE_WRITE_POOL_PAGE_NUM*0.75 {
 		go dw.FlushToDisk()
 	}
-
-	dw.memoryLock.Unlock()
 }
 
 // 将内存中的数据写入磁盘，关闭 DoubleWrite 文件，并且更新 LSN

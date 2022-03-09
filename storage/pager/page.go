@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"minidb-go/storage/pager/pagedata"
-	"minidb-go/storage/recovery/redo"
+	"minidb-go/storage/recovery/redo/redolog"
 	"minidb-go/transaction"
 	"minidb-go/util"
 	"minidb-go/util/byteconv"
@@ -33,7 +33,7 @@ type Page struct {
 	nextPageNum util.UUID
 	prevPageNum util.UUID
 
-	logs []*redo.Log
+	logs []redolog.Log
 
 	data     pagedata.PageData
 	dataCopy pagedata.PageData
@@ -109,11 +109,11 @@ func (page *Page) Raw() []byte {
 	return buff.Bytes()
 }
 
-func (page *Page) Logs() []*redo.Log {
+func (page *Page) Logs() []redolog.Log {
 	return page.logs
 }
 
-func (page *Page) AppendLog(log *redo.Log) {
+func (page *Page) AppendLog(log redolog.Log) {
 	page.logs = append(page.logs, log)
 }
 

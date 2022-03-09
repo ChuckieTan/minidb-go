@@ -82,7 +82,7 @@ func (pager *Pager) Select(spaceSize uint16, tableName string) (page *Page, err 
 		return
 	}
 
-	if util.PAGE_SIZE-uint16(page.Size()) >= spaceSize {
+	if util.PAGE_SIZE-uint16(page.Size()-512) >= spaceSize {
 		// 如果 page 可用空间大于等于需要的空间，则直接返回
 		return page, nil
 	} else {

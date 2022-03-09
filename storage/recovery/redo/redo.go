@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"sync"
+
+	"minidb-go/storage/recovery/redo/redolog"
 )
 
 type Redo struct {
@@ -47,7 +49,7 @@ func Open(path string, pageFile *os.File) *Redo {
 }
 
 // 添加一系列 redo log，并返回最后一个 redo log 的 LSN
-func (redo *Redo) Append(logs []*Log) (int64, error) {
+func (redo *Redo) Append(logs []redolog.Log) (int64, error) {
 	redo.lock.Lock()
 	defer redo.lock.Unlock()
 	buf := new(bytes.Buffer)
@@ -63,7 +65,7 @@ func (redo *Redo) Append(logs []*Log) (int64, error) {
 	return redo.LSN, nil
 }
 
-func (redo *Redo) write(log *Log, w io.Writer) error {
+func (redo *Redo) write(log redolog.Log, w io.Writer) error {
 	_, err := w.Write(log.Bytes())
 	if err != nil {
 		return err
@@ -71,24 +73,24 @@ func (redo *Redo) write(log *Log, w io.Writer) error {
 	return nil
 }
 
-func (redo *Redo) Recover(beginLSN int64) error {
+func (redo *Redo) Recover(beginLSN int64) {
 	redo.lock.Lock()
 	defer redo.lock.Unlock()
-	redo.redoFile.Seek(0, 0)
+	redo.redoFile.Seek(beginLSN, 0)
 	for {
-		buf := make([]byte, 1024)
+
 		n, err := redo.redoFile.Read(buf)
 		if err != nil {
 			if err == io.EOF {
 				break
-			} else {
-				log.Fatalf("read redo file failed: %v", err)
 			}
+			log.Fatal(err)
 		}
-		redo.pageFile.Write(buf[:n])
-		redo.pageFile.Sync()
+		redo.redoFile.Seek(redo.LSN, 0)
+		redo.redoFile.Write(buf[:n])
+		redo.redoFile.Sync()
+		redo.LSN += int64(n)
 	}
-	return nil
 }
 
 func (redo *Redo) Close() {

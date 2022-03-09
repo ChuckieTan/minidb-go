@@ -1,3 +1,17 @@
+/*
+可并行访问的 B+树，只能查找和插入，不能删除和修改
+B+ 树并行访问协议如下：
+对于查询操作，从根节点开始，首先获取根节点的读锁，
+然后在根节点中查找key应该出现的孩子节点，获取孩子节点的读锁，
+然后释放根节点的读锁，以此类推，直到找到目标叶子节点，此时该叶子节点获取了读锁。
+
+对于删除和插入操作，也是从根节点开始，
+先获取根节点的写锁，一旦孩子节点也获取了写锁，
+检查根节点是否安全，如果安全释放孩子节点所有祖先节点的写锁，
+以此类推，直到找到目标叶子节点。
+节点安全定义如下：如果对于插入操作，如果再插入一个元素，不会产生分裂，
+或者对于删除操作，如果再删除一个元素，不会产生并合。
+*/
 package bplustree
 
 import (
@@ -126,12 +140,35 @@ func bytesToUUID(bytes []byte) util.UUID {
 // pageNumber: 页号
 // return:
 // 		node: B+树节点
-func (tree *BPlusTree) getNode(pageNum util.UUID) (node *BPlusTreeNode, err error) {
-	node = &BPlusTreeNode{
+func (tree *BPlusTree) getNode(pageNum util.UUID) (*BPlusTreeNode, error) {
+	node := &BPlusTreeNode{
 		tree: tree,
 	}
-	_, err = tree.pager.GetPage(pageNum, node)
-	return
+	_, err := tree.pager.GetPage(pageNum, node)
+	return node, err
+}
+
+type VisitType bool
+
+const (
+	Visit_Read  VisitType = true
+	Visit_Write VisitType = false
+)
+
+func lockNode(node *BPlusTreeNode, visit VisitType) {
+	if visit == Visit_Read {
+		node.RLock()
+	} else {
+		node.Lock()
+	}
+}
+
+func unlockNode(node *BPlusTreeNode, visit VisitType) {
+	if visit == Visit_Read {
+		node.RUnlock()
+	} else {
+		node.Unlock()
+	}
 }
 
 // 返回 key 在 B+树中应该在的第一个位置
@@ -139,78 +176,77 @@ func (tree *BPlusTree) getNode(pageNum util.UUID) (node *BPlusTreeNode, err erro
 // return:
 // 		node: key 应该在的 B+树节点
 // 		index: 在节点中的下标
-func (tree *BPlusTree) searchLowerInTree(key index.KeyType) (*BPlusTreeNode, uint16) {
+func (tree *BPlusTree) searchLowerInTree(key index.KeyType, visit VisitType) (*BPlusTreeNode, uint16) {
 	node, err := tree.getNode(tree.Root)
 	if err != nil {
 		log.Fatalf("tree root page load error: %v", err)
 	}
+	lockNode(node, visit)
 	index := node.LowerBound(key)
 
 	for !node.isLeaf {
 		index = node.LowerBound(key)
-		node, err = tree.getNode(bytesToUUID(node.Values[index]))
+		childNode, err := tree.getNode(bytesToUUID(node.Values[index]))
 		if err != nil {
 			log.Fatal(err)
 		}
+		lockNode(childNode, visit)
+		unlockNode(node, visit)
+		node = childNode
 	}
 	return node, uint16(index)
 }
 
-func (tree *BPlusTree) searchUpperInTree(key index.KeyType) (*BPlusTreeNode, uint16) {
+func (tree *BPlusTree) searchUpperInTree(key index.KeyType, visit VisitType) (*BPlusTreeNode, uint16) {
 	node, err := tree.getNode(tree.Root)
 	if err != nil {
 		log.Fatalf("tree root page load error: %v", err)
 	}
+	lockNode(node, visit)
 	index := node.UpperBound(key)
 
 	for !node.isLeaf {
 		index = node.UpperBound(key)
-		node, err = tree.getNode(bytesToUUID(node.Values[index]))
+		childnNode, err := tree.getNode(bytesToUUID(node.Values[index]))
 		if err != nil {
 			log.Fatal(err)
 		}
+		lockNode(childnNode, visit)
+		unlockNode(node, visit)
 	}
 	return node, uint16(index)
 }
 
 func (tree *BPlusTree) Search(key index.KeyType) <-chan index.ValueType {
-	tree.RLock()
-	defer tree.RUnlock()
-
 	valueChan := make(chan index.ValueType, 64)
 
-	node, index := tree.searchLowerInTree(key)
-	if uint16(index) == node.Len || compare(node.Keys[index], key) != 0 {
+	leafNode, index := tree.searchLowerInTree(key, true)
+	if uint16(index) == leafNode.Len || compare(leafNode.Keys[index], key) != 0 {
 		close(valueChan)
-		return valueChan
-	}
-	nodePageNum := bytesToUUID(node.Values[index])
-	if nodePageNum == 0 {
-		close(valueChan)
+		unlockNode(leafNode, Visit_Read)
 		return valueChan
 	}
 
 	// 往 ValueChan 中放入数据
 	go func() {
 		defer close(valueChan)
-		leafNode, err := tree.getNode(nodePageNum)
-		if err != nil {
-			log.Fatal(err)
-		}
 		currentIndex := index
 		for {
-			for currentIndex < node.Len && compare(leafNode.Keys[currentIndex-1], key) == 0 {
+			for currentIndex < leafNode.Len && compare(leafNode.Keys[currentIndex-1], key) == 0 {
 				currentValue := leafNode.Values[currentIndex]
 				valueChan <- currentValue
 				currentIndex++
 			}
 			// 如果循环到当前 node 的最后一个 Value，则尝试获取下一个 node
-			if currentIndex == node.Len {
+			if currentIndex == leafNode.Len {
 				// 如果当前 node 是最后一个 node，则退出循环
 				if leafNode.NextLeaf == 0 {
 					break
 				}
-				leafNode, err = tree.getNode(leafNode.NextLeaf)
+				nextLeafNode, err := tree.getNode(leafNode.NextLeaf)
+				lockNode(nextLeafNode, Visit_Read)
+				unlockNode(leafNode, Visit_Read)
+				leafNode = nextLeafNode
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -219,6 +255,7 @@ func (tree *BPlusTree) Search(key index.KeyType) <-chan index.ValueType {
 				break
 			}
 		}
+		unlockNode(leafNode, Visit_Read)
 	}()
 	return valueChan
 }
@@ -227,8 +264,6 @@ func (tree *BPlusTree) Search(key index.KeyType) <-chan index.ValueType {
 // key: 主键
 // value: 值
 func (tree *BPlusTree) Insert(key index.KeyType, value index.ValueType) error {
-	tree.RLock()
-	defer tree.RUnlock()
 	// 如果已经存在相同的 (key, value), 则直接返回
 	valueChan := tree.Search(key)
 	for treeValue := range valueChan {
@@ -236,10 +271,9 @@ func (tree *BPlusTree) Insert(key index.KeyType, value index.ValueType) error {
 			return nil
 		}
 	}
-	node, _ := tree.searchLowerInTree(key)
+	node, _ := tree.searchLowerInTree(key, Visit_Write)
+	defer unlockNode(node, Visit_Write)
 
-	tree.Lock()
-	defer tree.Unlock()
 	// TODO: 新插入的 value 需要放在最后一个位置
 	ok := node.insertEntry(key, value)
 	if !ok {
@@ -254,6 +288,8 @@ func (tree *BPlusTree) Insert(key index.KeyType, value index.ValueType) error {
 
 func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
+	lockNode(node, Visit_Write)
+	defer unlockNode(node, Visit_Write)
 	if node.Addr == tree.Root {
 		newRoot := newNode(tree.order)
 		rootPage := tree.pager.NewPage(newRoot)
@@ -315,6 +351,8 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 }
 
 func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
+	lockNode(node, Visit_Write)
+	defer unlockNode(node, Visit_Write)
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
 	if node.Addr == tree.Root {
 		newRoot := newNode(tree.order)
