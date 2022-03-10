@@ -17,9 +17,13 @@ type Pager struct {
 	file  *os.File
 }
 
+const (
+	PAGE_FILE_NAME = "data.db"
+)
+
 func Create(path string) *Pager {
-	path = path + "/data.db"
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
+	path = path + "/" + PAGE_FILE_NAME
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		log.Fatalf("open file %s failed: %v", path, err)
 	}
@@ -27,11 +31,8 @@ func Create(path string) *Pager {
 		file: file,
 	}
 
-	pager.cache = lru.NewLRU(16)
-	pager.cache.SetEviction(func(key, value interface{}) {
-		// page := value.(*Page)
+	pager.cache = lru.NewLRU(util.PAGE_CACHE_CAP)
 
-	})
 	// 初始化 meta page
 	metaData := pagedata.NewMetaData()
 	metaPage := pager.NewPage(metaData)
@@ -41,7 +42,7 @@ func Create(path string) *Pager {
 }
 
 func Open(path string) *Pager {
-	path = path + "/data.db"
+	path = path + "/" + PAGE_FILE_NAME
 	file, err := os.OpenFile(path, os.O_RDWR, 0666)
 	if err != nil {
 		log.Fatalf("open file %s failed: %v", path, err)
@@ -50,11 +51,7 @@ func Open(path string) *Pager {
 		file: file,
 	}
 
-	pager.cache = lru.NewLRU(16)
-	pager.cache.SetEviction(func(key, value interface{}) {
-		// page := value.(*Page)
-		// pager.Flush(page)
-	})
+	pager.cache = lru.NewLRU(util.PAGE_CACHE_CAP)
 
 	metaPage, err := pager.GetPage(0, pagedata.NewMetaData())
 	if err != nil {
@@ -65,6 +62,10 @@ func Open(path string) *Pager {
 		log.Fatalf("version not match")
 	}
 	return pager
+}
+
+func (pager *Pager) SetCacheEviction(eviction cache.Eviction) {
+	pager.cache.SetEviction(eviction)
 }
 
 // 选择一个具有可用空间的 page
@@ -82,7 +83,7 @@ func (pager *Pager) Select(spaceSize uint16, tableName string) (page *Page, err 
 		return
 	}
 
-	if util.PAGE_SIZE-uint16(page.Size()-512) >= spaceSize {
+	if util.PAGE_SIZE-uint16(page.Size()-128) >= spaceSize {
 		// 如果 page 可用空间大于等于需要的空间，则直接返回
 		return page, nil
 	} else {

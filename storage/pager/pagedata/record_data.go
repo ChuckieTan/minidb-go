@@ -2,45 +2,61 @@ package pagedata
 
 import (
 	"bytes"
-	"encoding/gob"
+	"encoding/binary"
 	"io"
 	"minidb-go/parser/ast"
 )
 
 type RecordData struct {
-	rows []ast.Row
+	size uint16
+	rows []*ast.Row
 }
 
 func NewRecordData() *RecordData {
-	return &RecordData{}
+	return &RecordData{
+		size: 2 + 1,
+		rows: make([]*ast.Row, 0),
+	}
 }
 
 func (r *RecordData) Encode() []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(r)
-	if err != nil {
-		return nil
+	buf := bytes.NewBuffer([]byte{})
+	binary.Write(buf, binary.BigEndian, r.size)
+	binary.Write(buf, binary.BigEndian, uint8(len(r.rows)))
+	for _, row := range r.rows {
+		buf.Write(row.Encode())
 	}
 	return buf.Bytes()
 }
 
 func (record *RecordData) Decode(r io.Reader) error {
-	dec := gob.NewDecoder(r)
-	return dec.Decode(record)
+	binary.Read(r, binary.BigEndian, &record.size)
+	var count uint8
+	err := binary.Read(r, binary.BigEndian, &count)
+	if err != nil {
+		return err
+	}
+	record.rows = make([]*ast.Row, count)
+	for _, row := range record.rows {
+		err := row.Decode(r)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func (record *RecordData) Rows() []ast.Row {
+func (record *RecordData) Rows() []*ast.Row {
 	return record.rows
 }
 
 func (record *RecordData) Size() int {
-	raw := record.Encode()
-	return len(raw)
+	return int(record.size)
 }
 
-func (record *RecordData) Append(rows ast.Row) {
+func (record *RecordData) Append(rows *ast.Row) {
 	record.rows = append(record.rows, rows)
+	record.size += rows.Size()
 }
 
 func (record *RecordData) PageDataType() PageDataType {

@@ -21,7 +21,7 @@ type Redo struct {
 
 func Create(path string, pageFile *os.File) *Redo {
 	path = path + "/redo.log"
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		log.Fatalf("open file %s failed: %v", path, err)
 	}
@@ -61,7 +61,6 @@ func (redo *Redo) Append(logs []redolog.Log) (int64, error) {
 	}
 	redo.redoFile.Write(buf.Bytes())
 	redo.redoFile.Sync()
-	redo.LSN += int64(buf.Len())
 	return redo.LSN, nil
 }
 

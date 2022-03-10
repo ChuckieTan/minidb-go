@@ -58,17 +58,12 @@ func Open(path string, pageFile *os.File) *DoubleWrite {
 func Create(path string, pageFile *os.File) *DoubleWrite {
 	path = path + "/" + DOUBLE_WRITE_BUFF_FILE_NAME
 
-	// 判断文件是否存在
-	stat, err := os.Stat(path)
-	if err == nil && stat.Size() != 0 {
-		log.Fatalf("double write file %s already exists", path)
-	}
-
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		log.Fatalf("open double write file %s failed: %v", path, err)
 	}
 	file.Write(EMPTY_BUFFER)
+	file.Sync()
 	return &DoubleWrite{
 		pages:      make(map[util.UUID][]byte),
 		bufferFile: file,
@@ -118,20 +113,20 @@ func (dw *DoubleWrite) FlushToDisk() {
 	for _, pageBytes := range pages {
 		dw.bufferFile.Write(pageBytes)
 	}
+	dw.bufferFile.Sync()
 
 	// 然后再将脏页写入磁盘中的 page
 	maxLSN := int64(0)
 	for pageNum, pageBytes := range pages {
-		dw.pageFile.Seek(int64(pageNum*util.PAGE_SIZE), 0)
-		dw.pageFile.Write(pageBytes)
+		dw.pageFile.WriteAt(pageBytes, int64(pageNum*util.PAGE_SIZE))
+		dw.pageFile.Sync()
 		if getLSN(pageBytes) > maxLSN {
 			maxLSN = getLSN(pageBytes)
 		}
 	}
 
 	// 最后需要将 buffer 清空
-	dw.bufferFile.Seek(0, 0)
-	dw.bufferFile.Write(EMPTY_BUFFER)
+	dw.bufferFile.WriteAt(EMPTY_BUFFER, 0)
 
 	dw.diskLock.Unlock()
 

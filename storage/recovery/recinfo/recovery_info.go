@@ -27,7 +27,7 @@ type RecoveryInfo struct {
 
 func Create(path string) *RecoveryInfo {
 	path = path + "/" + REC_INFO_FILE_NAME
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		log.Fatalf("open file %s failed: %v", path, err)
 	}

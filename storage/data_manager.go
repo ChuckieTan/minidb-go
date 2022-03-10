@@ -35,20 +35,28 @@ type DataManager struct {
 }
 
 func Create(path string, recovery *recovery.Recovery) *DataManager {
-	pager := pager.Create(path)
+	p := pager.Create(path)
 	dm := &DataManager{
-		pager:    pager,
+		pager:    p,
 		recovery: recovery,
 	}
+	dm.pager.SetCacheEviction(func(key interface{}, val interface{}) {
+		page := val.(*pager.Page)
+		dm.recovery.Write(page)
+	})
 	return dm
 }
 
 func Open(path string, recovery *recovery.Recovery) *DataManager {
-	pager := pager.Open(path)
+	p := pager.Open(path)
 	dm := &DataManager{
-		pager:    pager,
+		pager:    p,
 		recovery: recovery,
 	}
+	dm.pager.SetCacheEviction(func(key interface{}, val interface{}) {
+		page := val.(*pager.Page)
+		dm.recovery.Write(page)
+	})
 	return dm
 }
 
@@ -61,8 +69,8 @@ func (dm *DataManager) getRecordData(pageNum util.UUID) *pagedata.RecordData {
 }
 
 func (dm *DataManager) SelectData(selectStatement *ast.SelectStatement) (
-	<-chan ast.Row, error) {
-	rows := make(chan ast.Row, 64)
+	<-chan *ast.Row, error) {
+	rows := make(chan *ast.Row, 64)
 	metaData := dm.pager.GetMetaData()
 	// 获取表信息
 	tableInfo := metaData.GetTableInfo(selectStatement.TableName)
@@ -91,18 +99,18 @@ func (dm *DataManager) SelectData(selectStatement *ast.SelectStatement) (
 
 // 把 where 转换成一个函数，返回值为 bool，表示是否符合条件
 func whereToFunc(tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) (
-	func(row ast.Row) bool, error,
+	func(row *ast.Row) bool, error,
 ) {
 	if expr == nil {
-		return func(row ast.Row) bool {
+		return func(row *ast.Row) bool {
 			return true
 		}, nil
 	}
 	if expr.Left.ValueType() == ast.SQL_COLUMN &&
 		expr.Right.ValueType() == ast.SQL_COLUMN {
 		// 两个都是列名
-		columnNameL := string(expr.Left.(ast.SQLColumn))
-		columnNameR := string(expr.Right.(ast.SQLColumn))
+		columnNameL := string(*expr.Left.(*ast.SQLColumn))
+		columnNameR := string(*expr.Right.(*ast.SQLColumn))
 		columnDefines := tableInfo.ColumnDefines()
 		indexL, indexR := -1, -1
 		for i, columnDefine := range columnDefines {
@@ -121,12 +129,12 @@ func whereToFunc(tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) (
 		}
 		switch expr.Op {
 		case token.TT_EQUAL:
-			return func(row ast.Row) bool {
-				return row[indexL] == row[indexR]
+			return func(row *ast.Row) bool {
+				return row.Data()[indexL] == row.Data()[indexR]
 			}, nil
 		case token.TT_NOT_EQUAL:
-			return func(row ast.Row) bool {
-				return row[indexL] != row[indexR]
+			return func(row *ast.Row) bool {
+				return row.Data()[indexL] != row.Data()[indexR]
 			}, nil
 		// TODO: 大于小于比较
 		default:
@@ -135,22 +143,22 @@ func whereToFunc(tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) (
 	} else if expr.Left.ValueType() == ast.SQL_COLUMN {
 		columnIndex := -1
 		for i, columnDefine := range tableInfo.ColumnDefines() {
-			if columnDefine.Name == string(expr.Left.(ast.SQLColumn)) {
+			if columnDefine.Name == string(*expr.Left.(*ast.SQLColumn)) {
 				columnIndex = i
 				break
 			}
 		}
 		if columnIndex == -1 {
-			return nil, fmt.Errorf("column %s not exist", expr.Left.(ast.SQLColumn))
+			return nil, fmt.Errorf("column %s not exist", *expr.Left.(*ast.SQLColumn))
 		}
 		switch expr.Op {
 		case token.TT_EQUAL:
-			return func(row ast.Row) bool {
-				return row[columnIndex] == expr.Right
+			return func(row *ast.Row) bool {
+				return row.Data()[columnIndex] == expr.Right
 			}, nil
 		case token.TT_NOT_EQUAL:
-			return func(row ast.Row) bool {
-				return row[columnIndex] != expr.Right
+			return func(row *ast.Row) bool {
+				return row.Data()[columnIndex] != expr.Right
 			}, nil
 		default:
 			return nil, fmt.Errorf("operator %v not support", expr.Op)
@@ -159,11 +167,11 @@ func whereToFunc(tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) (
 		// 两边都是常量，直接比较
 		switch expr.Op {
 		case token.TT_EQUAL:
-			return func(row ast.Row) bool {
+			return func(row *ast.Row) bool {
 				return expr.Left == expr.Right
 			}, nil
 		case token.TT_NOT_EQUAL:
-			return func(row ast.Row) bool {
+			return func(row *ast.Row) bool {
 				return expr.Left != expr.Right
 			}, nil
 		default:
@@ -172,11 +180,11 @@ func whereToFunc(tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) (
 	}
 }
 
-func (dm *DataManager) equalSearch(rows chan<- ast.Row, tableInfo *pagedata.TableInfo,
+func (dm *DataManager) equalSearch(rows chan<- *ast.Row, tableInfo *pagedata.TableInfo,
 	expr *ast.SQLExpr, value ast.SQLExprValue) {
 	if expr.Left.ValueType() == ast.SQL_COLUMN {
 		// 查询索引
-		columnName := string(expr.Left.(ast.SQLColumn))
+		columnName := string(*expr.Left.(*ast.SQLColumn))
 		columnDefine := tableInfo.GetColumnDefine(columnName)
 		if columnDefine == nil {
 			close(rows)
@@ -186,7 +194,7 @@ func (dm *DataManager) equalSearch(rows chan<- ast.Row, tableInfo *pagedata.Tabl
 		index := columnDefine.Index
 		if index == nil {
 			// 没有索引，全表扫描
-			log.Warnf("index %s not exist, full scan table", expr.Left.(ast.SQLColumn))
+			log.Warnf("index %s not exist, full scan table", *expr.Left.(*ast.SQLColumn))
 			dm.fullScan(rows, tableInfo, expr)
 			return
 		}
@@ -224,7 +232,7 @@ func (dm *DataManager) equalSearch(rows chan<- ast.Row, tableInfo *pagedata.Tabl
 	}
 }
 
-func (dm *DataManager) primaryKeyEqualSearch(rows chan<- ast.Row, primaryIndex index.Index, value ast.SQLExprValue) {
+func (dm *DataManager) primaryKeyEqualSearch(rows chan<- *ast.Row, primaryIndex index.Index, value ast.SQLExprValue) {
 	valueChan := primaryIndex.Search(value.Raw())
 	w := sync.WaitGroup{}
 	w.Add(util.MAX_SEARCH_THRESHOLD)
@@ -233,8 +241,8 @@ func (dm *DataManager) primaryKeyEqualSearch(rows chan<- ast.Row, primaryIndex i
 			defer w.Done()
 			for pageNumBytes := range valueChan {
 				pageNum := util.BytesToUUID(pageNumBytes)
-				dm.traverseData(rows, pageNum, func(row ast.Row) bool {
-					return row[0] == value
+				dm.traverseData(rows, pageNum, func(row *ast.Row) bool {
+					return row.Data()[0] == value
 				})
 			}
 		}()
@@ -246,7 +254,7 @@ func (dm *DataManager) primaryKeyEqualSearch(rows chan<- ast.Row, primaryIndex i
 }
 
 // 非主键索引相等查找
-func (dm *DataManager) simpleEqualSearch(rows chan<- ast.Row, simpleIndex index.Index,
+func (dm *DataManager) simpleEqualSearch(rows chan<- *ast.Row, simpleIndex index.Index,
 	primaryIndex index.Index, value ast.SQLExprValue) {
 	// 先查找主键索引
 	indexChan := simpleIndex.Search(value.Raw())
@@ -260,8 +268,8 @@ func (dm *DataManager) simpleEqualSearch(rows chan<- ast.Row, simpleIndex index.
 				pageNumChan := primaryIndex.Search(index.KeyType(primaryKeyBytes))
 				for pageNumBytes := range pageNumChan {
 					pageNum := util.BytesToUUID(pageNumBytes)
-					dm.traverseData(rows, pageNum, func(row ast.Row) bool {
-						return row[0] == value
+					dm.traverseData(rows, pageNum, func(row *ast.Row) bool {
+						return row.Data()[0] == value
 					})
 				}
 			}
@@ -274,7 +282,7 @@ func (dm *DataManager) simpleEqualSearch(rows chan<- ast.Row, simpleIndex index.
 }
 
 // 扫描指定表的全部数据，自动关闭 rows
-func (dm *DataManager) fullScan(rows chan<- ast.Row, tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) {
+func (dm *DataManager) fullScan(rows chan<- *ast.Row, tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) {
 	// TODO: 双线程扫描
 	check, err := whereToFunc(tableInfo, expr)
 	if err != nil {
@@ -296,7 +304,7 @@ func (dm *DataManager) fullScan(rows chan<- ast.Row, tableInfo *pagedata.TableIn
 }
 
 // 遍历数据页，查找符合条件的数据，不负责关闭 rows
-func (dm *DataManager) traverseData(rows chan<- ast.Row, pageNum util.UUID, check func(ast.Row) bool) {
+func (dm *DataManager) traverseData(rows chan<- *ast.Row, pageNum util.UUID, check func(*ast.Row) bool) {
 	recordData := dm.getRecordData(pageNum)
 	for _, row := range recordData.Rows() {
 		if check(row) {
@@ -313,17 +321,18 @@ func (dm *DataManager) InsertData(insertStatement *ast.InsertIntoStatement) {
 		log.Warnf("table %s not exist", insertStatement.TableName)
 		return
 	}
+	row := ast.NewRow(insertStatement.Row)
 	// TODO: 检查字段是否存在
-	dataPage, err := dm.pager.Select(insertStatement.Row.Size(), insertStatement.TableName)
+	dataPage, err := dm.pager.Select(row.Size(), insertStatement.TableName)
 	if err != nil {
 		log.Errorf("table %s not exist", insertStatement.TableName)
 		return
 	}
 	// 插入数据
 	pageData := dataPage.Data().(*pagedata.RecordData)
-	pageData.Append(insertStatement.Row)
+	pageData.Append(row)
 
-	redolog := redolog.NewRecordPageAppendLog(dataPage.PageNum(), insertStatement.Row)
+	redolog := redolog.NewRecordPageAppendLog(dataPage.PageNum(), row)
 	dataPage.AppendLog(redolog)
 	dm.recovery.Write(dataPage)
 

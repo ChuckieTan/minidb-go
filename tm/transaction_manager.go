@@ -29,6 +29,8 @@ const (
 	XID_FILE_NAME        = "minidb.xid"
 )
 
+const NIL_XID XID = 1<<32 - 1
+
 // 事务管理器
 type TransactionManager struct {
 	// XID文件
@@ -39,7 +41,7 @@ type TransactionManager struct {
 
 func Create(path string) (tm *TransactionManager) {
 	path = path + "/" + XID_FILE_NAME
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -145,12 +147,12 @@ func (tm *TransactionManager) IsActive(xid XID) (res bool) {
 	return
 }
 
-func (tm *TransactionManager) IsCommit(xid XID) (res bool) {
+func (tm *TransactionManager) IsCommitted(xid XID) (res bool) {
 	res = tm.checkStatus(xid, TRANS_COMMITED)
 	return
 }
 
-func (tm *TransactionManager) IsAbort(xid XID) (res bool) {
+func (tm *TransactionManager) IsAborted(xid XID) (res bool) {
 	res = tm.checkStatus(xid, TRANS_ABORTED)
 	return
 }

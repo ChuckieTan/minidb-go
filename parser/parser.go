@@ -347,7 +347,8 @@ func (parse *Parser) parseExprValue() (
 	resToken := parse.lexer.GetCurrentToken()
 	if resToken.Type == token.TT_IDENTIFIER {
 		parse.lexer.GetNextToken()
-		exprValue = ast.SQLColumn(resToken.Val)
+		column := ast.SQLColumn(resToken.Val)
+		exprValue = &column
 		return
 	} else {
 		exprValue, err = parse.parseLiteralValue()
@@ -385,7 +386,8 @@ func (parser *Parser) parseLiteralValue() (
 	t := parser.lexer.GetNextToken()
 	switch t.Type {
 	case token.TT_STRING:
-		value = ast.SQLText(t.Val)
+		val := ast.SQLText(t.Val)
+		value = &val
 	case token.TT_PLUS:
 		t = parser.lexer.GetNextToken()
 		value, err = parser.parseNumericValue(1, t)
@@ -410,7 +412,9 @@ func (parser *Parser) parseNumericValue(sign int, numToken token.Token) (
 			log.Error(err.Error())
 			return
 		}
-		return ast.SQLInt(int64(sign) * v), nil
+		v *= int64(sign)
+		val := ast.SQLInt(v)
+		return &val, nil
 	case token.TT_FLOAT:
 		var v float64
 		v, err = strconv.ParseFloat(numToken.Val, 64)
@@ -419,7 +423,9 @@ func (parser *Parser) parseNumericValue(sign int, numToken token.Token) (
 			log.Error(err.Error())
 			return
 		}
-		return ast.SQLFloat(float64(sign) * v), nil
+		v *= float64(sign)
+		val := ast.SQLFloat(v)
+		return &val, nil
 	default:
 		err = fmt.Errorf("expected a value, given '%v'", numToken.Val)
 		log.Error(err.Error())

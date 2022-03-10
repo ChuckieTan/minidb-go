@@ -12,10 +12,10 @@ import (
 type RecordPageAppendLog struct {
 	lsn     int64
 	pageNum util.UUID
-	row     ast.Row
+	row     *ast.Row
 }
 
-func NewRecordPageAppendLog(pageNum util.UUID, row ast.Row) *RecordPageAppendLog {
+func NewRecordPageAppendLog(pageNum util.UUID, row *ast.Row) *RecordPageAppendLog {
 	return &RecordPageAppendLog{
 		pageNum: pageNum,
 		row:     row,
@@ -34,7 +34,7 @@ func (log *RecordPageAppendLog) PageNum() util.UUID {
 	return log.pageNum
 }
 
-func (log *RecordPageAppendLog) Row() ast.Row {
+func (log *RecordPageAppendLog) Row() *ast.Row {
 	return log.row
 }
 
@@ -44,8 +44,8 @@ func (log *RecordPageAppendLog) Type() LogType {
 
 func (log *RecordPageAppendLog) Bytes() []byte {
 	buf := bytes.NewBuffer([]byte{})
-	binary.Write(buf, binary.LittleEndian, log.Type())
-	gob.NewDecoder(buf).Decode(log)
+	binary.Write(buf, binary.BigEndian, log.Type())
+	gob.NewEncoder(buf).Encode(log)
 	return buf.Bytes()
 }
 

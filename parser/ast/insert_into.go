@@ -2,7 +2,7 @@ package ast
 
 type InsertIntoStatement struct {
 	TableName string
-	Row       Row
+	Row       []SQLExprValue
 }
 
 func (statement InsertIntoStatement) StatementType() string {

@@ -3,6 +3,9 @@ package lru
 import (
 	"container/list"
 	"minidb-go/util/cache"
+	"sync"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type LRU struct {
@@ -13,6 +16,8 @@ type LRU struct {
 	cacheList *list.List
 	// map 存放 list node 的指针
 	cacheMap map[interface{}]*list.Element
+
+	lock sync.RWMutex
 }
 
 type entry struct {
@@ -29,6 +34,8 @@ func NewLRU(maxEntries int) (cache *LRU) {
 }
 
 func (cache *LRU) Set(key interface{}, value interface{}) {
+	cache.lock.Lock()
+	defer cache.lock.Unlock()
 	if cache.cacheList == nil {
 		cache.cacheList = list.New()
 		cache.cacheMap = make(map[interface{}]*list.Element)
@@ -49,6 +56,9 @@ func (cache *LRU) Set(key interface{}, value interface{}) {
 }
 
 func (cache *LRU) Get(key interface{}) (value interface{}, ok bool) {
+	cache.lock.RLock()
+	defer cache.lock.RUnlock()
+
 	if cache.cacheMap == nil {
 		return
 	}
@@ -72,6 +82,8 @@ func (cache *LRU) removeOldest() {
 }
 
 func (cache *LRU) Remove(key interface{}) {
+	cache.lock.Lock()
+	defer cache.lock.Unlock()
 	if cache.cacheMap == nil {
 		return
 	}
@@ -91,9 +103,24 @@ func (cache *LRU) removeElement(element *list.Element) {
 }
 
 func (cache *LRU) Len() int {
+	cache.lock.RLock()
+	defer cache.lock.RUnlock()
+
 	return cache.cacheList.Len()
 }
 
 func (cache *LRU) SetEviction(eviction cache.Eviction) {
 	cache.OnEvicted = eviction
+}
+
+func (cache *LRU) Close() {
+	log.Info("clearing pages in cache...")
+	if cache.OnEvicted != nil {
+		for cache.cacheList.Len() > 0 {
+			entry := cache.cacheList.Back().Value.(*entry)
+			cache.OnEvicted(entry.key, entry.value)
+			cache.cacheList.Remove(cache.cacheList.Back())
+			delete(cache.cacheMap, entry.key)
+		}
+	}
 }

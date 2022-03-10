@@ -12,8 +12,28 @@ func BytesToInt64(b []byte) int64 {
 	return ans
 }
 
+func Uint64ToBytes(i uint64) []byte {
+	byteSlice := make([]byte, 8)
+	byteSlice[0] = byte(i)
+	byteSlice[1] = byte(i >> 8)
+	byteSlice[2] = byte(i >> 16)
+	byteSlice[3] = byte(i >> 24)
+	byteSlice[4] = byte(i >> 32)
+	byteSlice[5] = byte(i >> 40)
+	byteSlice[6] = byte(i >> 48)
+	byteSlice[7] = byte(i >> 56)
+	return byteSlice
+}
+
 func BytesToUUID(b []byte) UUID {
 	return UUID(BytesToUInt32(b))
+}
+
+func Uint16ToBytes(i uint16) []byte {
+	byteSlice := make([]byte, 2)
+	byteSlice[0] = byte(i)
+	byteSlice[1] = byte(i >> 8)
+	return byteSlice
 }
 
 func Uint32ToBytes(size uint8, i uint32) []byte {
