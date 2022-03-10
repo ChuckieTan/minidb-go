@@ -38,6 +38,7 @@ func (tree *BPlusTree) getNodePage(pageNum util.UUID) (*pager.Page, *BPlusTreeNo
 		tree: tree,
 	}
 	page, err := tree.pager.GetPage(pageNum, node)
+	node.page = page
 	return page, node, err
 }
 
@@ -68,6 +69,7 @@ func (tree *BPlusTree) recoverSplitLeafNode(page *pager.Page, nextPage *pager.Pa
 	if node.Addr == tree.Root {
 		newRoot := newNode(tree.order)
 		rootPage := tree.pager.NewPage(newRoot)
+		newRoot.page = rootPage
 		newRoot.Addr = rootPage.PageNum()
 		newRoot.Parent = 0
 		newRoot.Len = 0
@@ -132,6 +134,7 @@ func (tree *BPlusTree) recoverSplitNonLeafNode(page *pager.Page, nextPage *pager
 	if node.Addr == tree.Root {
 		newRoot := newNode(tree.order)
 		newRootPage := tree.pager.NewPage(newRoot)
+		newRoot.page = newRootPage
 		newRoot.Addr = newRootPage.PageNum()
 		newRoot.Parent = 0
 		newRoot.isLeaf = false

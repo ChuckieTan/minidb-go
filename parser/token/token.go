@@ -53,6 +53,10 @@ const (
 	TT_MOD      // %
 	TT_ASSIGN   // =
 	TT_ALL      // all
+
+	TT_BEGIN
+	TT_COMMIT
+	TT_ROLLBACK
 )
 
 type Token struct {

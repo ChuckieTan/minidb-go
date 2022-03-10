@@ -5,7 +5,7 @@ TRANS_COMMITED		已提交
 TRANS_ABORTED		已撤销
 事务的状态用 1 个字节存储
 */
-package transaction
+package tm
 
 import (
 	"encoding/binary"
@@ -26,32 +26,20 @@ const (
 const (
 	MINIDB_XID_HEADER    = "Minidb XID file"
 	XID_FILE_HEADER_SIZE = 4
-	XID_FILE_SUFFIX      = ".xid"
+	XID_FILE_NAME        = "minidb.xid"
 )
-
-// type TransactionManager interface {
-// 	Create()
-// 	Open()
-// 	Close()
-
-// 	Begin() XID
-// 	Commit(XID)
-// 	Abort(XID)
-
-// 	IsActive(XID) bool
-// 	IsCommit(XID) bool
-// 	IsAbort(XID) bool
-// }
 
 // 事务管理器
 type TransactionManager struct {
 	// XID文件
-	file       *os.File
+	file *os.File
+	// 当前 XID 的最大值
 	xidCounter XID
 }
 
 func Create(path string) (tm *TransactionManager) {
-	file, err := os.OpenFile(path+XID_FILE_SUFFIX, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	path = path + "/" + XID_FILE_NAME
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -62,7 +50,8 @@ func Create(path string) (tm *TransactionManager) {
 }
 
 func Open(path string) (tm *TransactionManager) {
-	file, err := os.OpenFile(path+XID_FILE_SUFFIX, os.O_RDWR, 0600)
+	path = path + "/" + XID_FILE_NAME
+	file, err := os.OpenFile(path, os.O_RDWR, 0600)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -91,8 +80,7 @@ func xidPosition(xid XID) (position uint32) {
 
 func (tm *TransactionManager) updateXID(xid XID, status byte) {
 	offset := xidPosition(xid)
-	statusBytes := make([]byte, 1)
-	statusBytes[0] = status
+	statusBytes := []byte{status}
 	n, err := tm.file.WriteAt(statusBytes, int64(offset))
 	if n != 1 {
 		log.Fatal("unknown xid file write error")
@@ -146,7 +134,7 @@ func (tm *TransactionManager) checkStatus(xid XID, status byte) (res bool) {
 	statusBytes := make([]byte, 1)
 	_, err := tm.file.ReadAt(statusBytes, int64(xidPosition(xid)))
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 	res = statusBytes[0] == status
 	return

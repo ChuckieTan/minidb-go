@@ -14,6 +14,8 @@ import (
 	"minidb-go/storage/index"
 	"minidb-go/storage/pager"
 	"minidb-go/storage/pager/pagedata"
+	"minidb-go/storage/recovery"
+	"minidb-go/storage/recovery/redo/redolog"
 	"minidb-go/util"
 	"sync"
 
@@ -27,21 +29,25 @@ var (
 type DataManager struct {
 	pager *pager.Pager
 
+	// recovery 在创建时传入，不负责关闭
+	recovery *recovery.Recovery
 	//TODO: Data Cache，自适应哈希索引
 }
 
-func Create(path string) *DataManager {
+func Create(path string, recovery *recovery.Recovery) *DataManager {
 	pager := pager.Create(path)
 	dm := &DataManager{
-		pager: pager,
+		pager:    pager,
+		recovery: recovery,
 	}
 	return dm
 }
 
-func Open(path string) *DataManager {
+func Open(path string, recovery *recovery.Recovery) *DataManager {
 	pager := pager.Open(path)
 	dm := &DataManager{
-		pager: pager,
+		pager:    pager,
+		recovery: recovery,
 	}
 	return dm
 }
@@ -316,6 +322,10 @@ func (dm *DataManager) InsertData(insertStatement *ast.InsertIntoStatement) {
 	// 插入数据
 	pageData := dataPage.Data().(*pagedata.RecordData)
 	pageData.Append(insertStatement.Row)
+
+	redolog := redolog.NewRecordPageAppendLog(dataPage.PageNum(), insertStatement.Row)
+	dataPage.AppendLog(redolog)
+	dm.recovery.Write(dataPage)
 
 	for i, columnDefine := range tableInfo.ColumnDefines() {
 		index := columnDefine.Index

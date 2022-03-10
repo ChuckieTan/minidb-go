@@ -6,7 +6,9 @@ import (
 	"errors"
 	"io"
 	"minidb-go/storage/index"
+	"minidb-go/storage/pager"
 	"minidb-go/storage/pager/pagedata"
+	"minidb-go/storage/recovery/redo/redolog"
 	"minidb-go/util"
 	"sort"
 	"sync"
@@ -28,6 +30,7 @@ type BPlusTreeNode struct {
 
 	// 只在内存中使用，用于解码
 	tree *BPlusTree
+	page *pager.Page
 
 	lock sync.RWMutex
 }
@@ -67,6 +70,10 @@ func (node *BPlusTreeNode) needSplit() bool {
 // 可以插入重复的 Key
 // TODO: 如果 Key 和 Value 都存在， 则不插入
 func (node *BPlusTreeNode) insertEntry(key index.KeyType, value index.ValueType) (ok bool) {
+	redolog := redolog.NewBNodeInsertKVLog(
+		node.tree.tableId, node.tree.columnId, node.Addr, key, value)
+	node.page.AppendLog(redolog)
+
 	index := node.LowerBound(key)
 
 	// 插入 key

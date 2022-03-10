@@ -19,6 +19,7 @@ var ErrUnknownLogType = errors.New("unknown log type")
 
 type Log interface {
 	LSN() int64
+	SetLSN(int64)
 	Type() LogType
 	Bytes() []byte
 	Decode(r io.Reader)

@@ -22,10 +22,23 @@ func NewParser(sql string) (parser Parser, err error) {
 	return parser, nil
 }
 
-func (parser *Parser) ParseStatement() (
-	statement ast.SQLStatement, err error,
-) {
+func (parser *Parser) ParseStatement() (statement ast.SQLStatement, err error) {
 	savePoint := parser.lexer.mark()
+	if parser.chain(token.TT_BEGIN) {
+		return &ast.SQLBeginTransaction{}, nil
+	}
+
+	parser.lexer.reset(savePoint)
+	if parser.chain(token.TT_COMMIT) {
+		return &ast.SQLCommitTransaction{}, nil
+	}
+
+	parser.lexer.reset(savePoint)
+	if parser.chain(token.TT_ROLLBACK) {
+		return &ast.SQLRollbackTransaction{}, nil
+	}
+
+	parser.lexer.reset(savePoint)
 	if parser.chain(token.TT_CREATE, token.TT_TABLE) {
 		statement, err = parser.ParseCreateTableStatement()
 		return
@@ -55,6 +68,10 @@ func (parser *Parser) ParseStatement() (
 	}
 	err = fmt.Errorf("expected a statement")
 	return
+}
+
+func (parser *Parser) parseTransaction() {
+
 }
 
 func (parser *Parser) parseCreateIndexStatement() (

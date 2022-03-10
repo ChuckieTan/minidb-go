@@ -6,7 +6,7 @@ import (
 	"io"
 	"minidb-go/storage/pager/pagedata"
 	"minidb-go/storage/recovery/redo/redolog"
-	"minidb-go/transaction"
+	"minidb-go/tm"
 	"minidb-go/util"
 	"minidb-go/util/byteconv"
 	"sync"
@@ -138,7 +138,7 @@ func (p *Page) SetPrevPageNum(pageNum util.UUID) {
 	p.nextPageNum = pageNum
 }
 
-func (p *Page) BeforeRead() (XID transaction.XID) {
+func (p *Page) BeforeRead() (XID tm.XID) {
 	p.rwlock.RLock()
 	util.DeepCopy(&p.dataCopy, &p.data)
 	return
@@ -148,7 +148,7 @@ func (p *Page) AfterRead() {
 	p.rwlock.RUnlock()
 }
 
-func (p *Page) BeforeWrite() (XID transaction.XID) {
+func (p *Page) BeforeWrite() (XID tm.XID) {
 	p.rwlock.Lock()
 	util.DeepCopy(&p.dataCopy, &p.data)
 	return

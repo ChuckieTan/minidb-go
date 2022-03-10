@@ -5,26 +5,20 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"io"
+	"minidb-go/parser/ast"
 	"minidb-go/util"
 )
 
 type RecordPageAppendLog struct {
-	lsn      int64
-	tableId  uint16
-	columnId uint16
-	pageNum  util.UUID
-	row      []byte
+	lsn     int64
+	pageNum util.UUID
+	row     ast.Row
 }
 
-func NewRecordPageAppendLog(tableId uint16, columnId uint16, pageNum util.UUID,
-	row []byte) *RecordPageAppendLog {
-
+func NewRecordPageAppendLog(pageNum util.UUID, row ast.Row) *RecordPageAppendLog {
 	return &RecordPageAppendLog{
-		lsn:      -1,
-		tableId:  tableId,
-		columnId: columnId,
-		pageNum:  pageNum,
-		row:      row,
+		pageNum: pageNum,
+		row:     row,
 	}
 }
 
@@ -36,19 +30,11 @@ func (log *RecordPageAppendLog) SetLSN(LSN int64) {
 	log.lsn = LSN
 }
 
-func (log *RecordPageAppendLog) TableId() uint16 {
-	return log.tableId
-}
-
-func (log *RecordPageAppendLog) ColumnId() uint16 {
-	return log.columnId
-}
-
 func (log *RecordPageAppendLog) PageNum() util.UUID {
 	return log.pageNum
 }
 
-func (log *RecordPageAppendLog) Row() []byte {
+func (log *RecordPageAppendLog) Row() ast.Row {
 	return log.row
 }
 

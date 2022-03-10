@@ -127,6 +127,9 @@ var keywordTokenType = map[string]token.TokenType{
 	"between":  token.TT_BETWEEN,
 	"distinct": token.TT_DISTINCT,
 	"all":      token.TT_ALL,
+	"begin":    token.TT_BEGIN,
+	"commit":   token.TT_COMMIT,
+	"rollback": token.TT_ROLLBACK,
 }
 
 func scanLiteralToken(sql string, pos int) (resToken token.Token, err error) {

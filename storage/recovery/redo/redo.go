@@ -66,7 +66,10 @@ func (redo *Redo) Append(logs []redolog.Log) (int64, error) {
 }
 
 func (redo *Redo) write(log redolog.Log, w io.Writer) error {
-	_, err := w.Write(log.Bytes())
+	log.SetLSN(redo.LSN)
+	raw := log.Bytes()
+	redo.LSN += int64(len(raw))
+	_, err := w.Write(raw)
 	if err != nil {
 		return err
 	}
@@ -78,18 +81,16 @@ func (redo *Redo) Recover(beginLSN int64) {
 	defer redo.lock.Unlock()
 	redo.redoFile.Seek(beginLSN, 0)
 	for {
-
-		n, err := redo.redoFile.Read(buf)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			log.Fatal(err)
-		}
-		redo.redoFile.Seek(redo.LSN, 0)
-		redo.redoFile.Write(buf[:n])
-		redo.redoFile.Sync()
-		redo.LSN += int64(n)
+		// log, err := redolog.Read(redo.redoFile)
+		// if err != nil {
+		// 	if err == io.EOF {
+		// 		break
+		// 	}
+		// 	log.Printf("read redo log failed: %v", err)
+		// 	break
+		// }
+		// redo.LSN = log.LSN()
+		// redo.apply(log)
 	}
 }
 

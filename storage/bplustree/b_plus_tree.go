@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"minidb-go/storage/index"
 	p "minidb-go/storage/pager"
+	"minidb-go/storage/recovery"
+	"minidb-go/storage/recovery/redo/redolog"
 	"minidb-go/util"
 	"sync"
 
@@ -35,7 +37,11 @@ type BPlusTree struct {
 	keySize   uint8
 	valueSize uint8
 
+	tableId  uint16
+	columnId uint16
+
 	pager *p.Pager
+	rec   *recovery.Recovery
 
 	lock sync.RWMutex
 }
@@ -45,12 +51,14 @@ type BPlusTree struct {
 // valueSize: 值的大小， 单位 byte， 不能小于 4 byte
 // return:
 // 		tree: b+树
-func NewTree(pager *p.Pager, keySize uint8, valueSize uint8) (tree BPlusTree) {
+func NewTree(pager *p.Pager, keySize uint8, valueSize uint8,
+	tableId uint16, columnId uint16, rec *recovery.Recovery) (tree BPlusTree) {
 	// order: 每个节点的最大项数，需要为偶数
 	order := uint16((util.PAGE_SIZE-1024)/uint16(keySize+valueSize)) / 2 * 2
 
 	rootNode := newNode(order)
 	rootPage := pager.NewPage(rootNode)
+	rootNode.page = rootPage
 	rootNode.Addr = rootPage.PageNum()
 	rootNode.Parent = 0
 	rootNode.PreLeaf = 0
@@ -65,9 +73,14 @@ func NewTree(pager *p.Pager, keySize uint8, valueSize uint8) (tree BPlusTree) {
 	tree.keySize = keySize
 	tree.valueSize = valueSize
 	tree.pager = pager
+	tree.tableId = tableId
+	tree.columnId = columnId
+	tree.rec = rec
 
 	rootNode.Keys = make([]index.KeyType, order)
 	rootNode.Values = make([]index.ValueType, order+1)
+
+	tree.pager.Flush(rootPage)
 	return
 }
 
@@ -85,6 +98,14 @@ func (tree *BPlusTree) Lock() {
 
 func (tree *BPlusTree) Unlock() {
 	tree.lock.Unlock()
+}
+
+func (tree *BPlusTree) TableId() uint16 {
+	return tree.tableId
+}
+
+func (tree *BPlusTree) ColumnId() uint16 {
+	return tree.columnId
 }
 
 func (tree *BPlusTree) Order() uint16 {
@@ -144,7 +165,8 @@ func (tree *BPlusTree) getNode(pageNum util.UUID) (*BPlusTreeNode, error) {
 	node := &BPlusTreeNode{
 		tree: tree,
 	}
-	_, err := tree.pager.GetPage(pageNum, node)
+	page, err := tree.pager.GetPage(pageNum, node)
+	node.page = page
 	return node, err
 }
 
@@ -276,6 +298,8 @@ func (tree *BPlusTree) Insert(key index.KeyType, value index.ValueType) error {
 
 	// TODO: 新插入的 value 需要放在最后一个位置
 	ok := node.insertEntry(key, value)
+	tree.rec.Write(node.page)
+
 	if !ok {
 		err := fmt.Errorf("insert key-value pair failed: key: %v, value: %v", key, value)
 		return err
@@ -290,9 +314,11 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
 	lockNode(node, Visit_Write)
 	defer unlockNode(node, Visit_Write)
+
 	if node.Addr == tree.Root {
 		newRoot := newNode(tree.order)
 		rootPage := tree.pager.NewPage(newRoot)
+		newRoot.page = rootPage
 		newRoot.Addr = rootPage.PageNum()
 		newRoot.Parent = 0
 		newRoot.Len = 0
@@ -308,8 +334,13 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 
 	newNode := newNode(tree.order)
 	newNodePage := tree.pager.NewPage(newNode)
+	newNode.page = newNodePage
 	newNode.Addr = newNodePage.PageNum()
 	newNode.Parent = node.Parent
+
+	redolog := redolog.NewBNodeSplitLog(
+		tree.tableId, tree.columnId, node.Addr, newNode.Addr)
+	node.page.AppendLog(redolog)
 
 	// 更新树的最后一个节点
 	if tree.LastLeaf == node.Addr {
@@ -342,6 +373,9 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 		tree.LastLeaf = newNode.Addr
 	}
 
+	tree.rec.Write(node.page)
+	tree.rec.Write(newNode.page)
+
 	// 递归更改父节点
 	parentNode, _ := tree.getNode(node.Parent)
 	parentNode.insertEntry(newNode.Keys[0], util.UUIDToBytes(tree.valueSize, newNode.Addr))
@@ -357,6 +391,7 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 	if node.Addr == tree.Root {
 		newRoot := newNode(tree.order)
 		newRootPage := tree.pager.NewPage(newRoot)
+		newRoot.page = newRootPage
 		newRoot.Addr = newRootPage.PageNum()
 		newRoot.Parent = 0
 		newRoot.isLeaf = false
@@ -370,6 +405,7 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 
 	newNode := newNode(tree.order)
 	newNodePage := tree.pager.NewPage(newNode)
+	newNode.page = newNodePage
 	newNode.Addr = newNodePage.PageNum()
 
 	// 复制一半元素
@@ -390,7 +426,13 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 	for i := uint16(0); i < newNode.Len+1; i++ {
 		child, _ := tree.getNode(util.BytesToUUID(newNode.Values[i]))
 		child.Parent = newNode.Addr
+
+		tree.rec.Write(child.page)
 	}
+
+	// 写入 page 到 double write
+	tree.rec.Write(node.page)
+	tree.rec.Write(newNode.page)
 
 	k := node.Keys[node.Len]
 	v := util.UUIDToBytes(tree.valueSize, newNode.Addr)
