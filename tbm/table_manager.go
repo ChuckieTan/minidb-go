@@ -34,9 +34,10 @@ func (tbm *TableManager) NewResultList(tableName string, rows []*ast.Row) (*Resu
 type TableManager struct {
 	metaData *pagedata.MetaData
 
-	pager      *pager.Pager
-	rec        *recovery.Recovery
-	serializer *serialization.Serializer
+	pager       *pager.Pager
+	rec         *recovery.Recovery
+	dataManager *storage.DataManager
+	serializer  *serialization.Serializer
 }
 
 func Create(path string) *TableManager {
@@ -45,10 +46,11 @@ func Create(path string) *TableManager {
 	dataManager := storage.Create(path, pager, rec)
 	serializer := serialization.Create(path, dataManager)
 	tbm := &TableManager{
-		metaData:   pager.GetMetaData(),
-		serializer: serializer,
-		pager:      pager,
-		rec:        rec,
+		metaData:    pager.GetMetaData(),
+		serializer:  serializer,
+		pager:       pager,
+		rec:         rec,
+		dataManager: dataManager,
 	}
 	return tbm
 }
@@ -59,10 +61,11 @@ func Open(path string) *TableManager {
 	dataManager := storage.Open(path, pager, rec)
 	serializer := serialization.Open(path, dataManager)
 	tbm := &TableManager{
-		metaData:   pager.GetMetaData(),
-		serializer: serializer,
-		pager:      pager,
-		rec:        rec,
+		metaData:    pager.GetMetaData(),
+		serializer:  serializer,
+		pager:       pager,
+		rec:         rec,
+		dataManager: dataManager,
 	}
 	return tbm
 }
@@ -128,6 +131,7 @@ func (tbm *TableManager) Update(xid tm.XID, updateStmt ast.UpdateStmt) (*ResultL
 	rows := make([]*ast.Row, 0)
 	for _, row := range old_rows {
 		insertValues := row.DeepCopyData()
+		insertValues = insertValues[:len(insertValues)-2]
 		for i, columnAssign := range updateStmt.ColumnAssignList {
 			insertValues[columnIds[i]] = columnAssign.Value
 		}
@@ -162,4 +166,11 @@ func (tbm *TableManager) CreateTable(xid tm.XID, createTableStmt ast.CreateTable
 
 	tbm.metaData.AddTable(tableInfo)
 	return nil
+}
+
+func (tbm *TableManager) Close() {
+	tbm.serializer.Close()
+	tbm.dataManager.Close()
+	tbm.pager.Close()
+	tbm.rec.Close()
 }

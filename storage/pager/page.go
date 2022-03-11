@@ -2,12 +2,11 @@ package pager
 
 import (
 	"bytes"
-	"fmt"
+	"encoding/binary"
 	"io"
 	"minidb-go/storage/pager/pagedata"
 	"minidb-go/storage/recovery/redo/redolog"
 	"minidb-go/util"
-	"minidb-go/util/byteconv"
 	"sync"
 )
 
@@ -55,39 +54,12 @@ func newPage(pageNum util.UUID, pageData pagedata.PageData) *Page {
 func LoadPage(r io.Reader, pageData pagedata.PageData) (*Page, error) {
 	page := &Page{}
 
-	err := byteconv.Decode(r, &page.pageNum)
-	if err != nil {
-		err = fmt.Errorf("decode page num failed: %v", err)
-		return nil, err
-	}
-	err = byteconv.Decode(r, &page.LSN)
-	if err != nil {
-		err = fmt.Errorf("decode LSN failed: %v", err)
-		return nil, err
-	}
-	err = byteconv.Decode(r, &page.nextPageNum)
-	if err != nil {
-		err = fmt.Errorf("decode next page num failed: %v", err)
-		return nil, err
-	}
-	err = byteconv.Decode(r, &page.prevPageNum)
-	if err != nil {
-		err = fmt.Errorf("decode prev page num failed: %v", err)
-		return nil, err
-	}
-	var dataLen uint16
-	err = byteconv.Decode(r, &dataLen)
-	if err != nil {
-		err = fmt.Errorf("decode data length failed: %v", err)
-		return nil, err
-	}
+	binary.Read(r, binary.BigEndian, &page.pageNum)
+	binary.Read(r, binary.BigEndian, &page.LSN)
+	binary.Read(r, binary.BigEndian, &page.nextPageNum)
+	binary.Read(r, binary.BigEndian, &page.prevPageNum)
 	page.data = pageData
 	page.data.Decode(r)
-
-	if err != nil {
-		return nil, err
-	}
-
 	return page, nil
 }
 
@@ -98,10 +70,10 @@ func (p *Page) PageNum() util.UUID {
 // 返回 Page 数据的二进制，PageSize的大小
 func (page *Page) Raw() []byte {
 	buff := new(bytes.Buffer)
-	byteconv.Encode(buff, page.pageNum)
-	byteconv.Encode(buff, page.LSN)
-	byteconv.Encode(buff, page.nextPageNum)
-	byteconv.Encode(buff, page.prevPageNum)
+	binary.Write(buff, binary.BigEndian, page.pageNum)
+	binary.Write(buff, binary.BigEndian, page.LSN)
+	binary.Write(buff, binary.BigEndian, page.nextPageNum)
+	binary.Write(buff, binary.BigEndian, page.prevPageNum)
 	dataByte := page.data.Encode()
 	buff.Write(dataByte)
 	zeroLen := util.PAGE_SIZE - buff.Len()

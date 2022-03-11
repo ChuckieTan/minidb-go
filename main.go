@@ -36,7 +36,8 @@ func main() {
 	sql2 := "select * from student where id = 1;"
 	sql3 := "update student set id = 1, name = 'sam' where id = 1;"
 
-	tbm := tbm.Create("/tmp/test/")
+	// tbm := tbm.Create("/tmp/test/")
+	tbm := tbm.Open("/tmp/test/")
 	xid := tbm.Begin()
 	p, _ := parser.NewParser(sql0)
 	stmt, _ := p.ParseStatement()
@@ -62,5 +63,13 @@ func main() {
 	result, err = tbm.Update(xid, updateStmt)
 	fmt.Println(result, err)
 
+	p, _ = parser.NewParser(sql2)
+	stmt, _ = p.ParseStatement()
+	selectStmt = stmt.(ast.SelectStmt)
+	result, err = tbm.Select(xid, selectStmt)
+	fmt.Println(result, err)
+
 	tbm.Commit(xid)
+
+	tbm.Close()
 }

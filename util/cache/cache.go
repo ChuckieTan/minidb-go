@@ -36,6 +36,8 @@ type Cache interface {
 
 	// SetExpiration sets the expiration function for the cache.
 	// SetExpiration(expiration Expiration)
+
+	Close()
 }
 
 type Eviction func(key, value interface{})

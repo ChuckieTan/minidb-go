@@ -129,7 +129,7 @@ func (pager *Pager) GetPage(pageNum util.UUID, pageData pagedata.PageData) (*Pag
 		pager.file.Seek(0, io.SeekEnd)
 		page, err := LoadPage(pager.file, pageData)
 		if err != nil {
-			log.Errorf("load page failed: %v", err)
+			log.Fatalf("load page failed: %v", err)
 			return nil, err
 		}
 		pager.cache.Set(pageNum, page)
@@ -154,5 +154,6 @@ func (pager *Pager) Flush(page *Page) {
 }
 
 func (pager *Pager) Close() {
+	pager.cache.Close()
 	pager.file.Close()
 }

@@ -360,3 +360,7 @@ func (dm *DataManager) InsertData(insertStatement ast.InsertIntoStmt) {
 		}
 	}
 }
+
+func (dm *DataManager) Close() {
+
+}

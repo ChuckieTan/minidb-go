@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"log"
 	"minidb-go/parser/ast"
 )
 
@@ -34,12 +35,14 @@ func (record *RecordData) Decode(r io.Reader) error {
 	var count uint8
 	err := binary.Read(r, binary.BigEndian, &count)
 	if err != nil {
+		log.Fatal(err)
 		return err
 	}
 	record.rows = make([]*ast.Row, count)
 	for _, row := range record.rows {
 		err := row.Decode(r)
 		if err != nil {
+			log.Fatal(err)
 			return err
 		}
 	}

@@ -220,3 +220,7 @@ func isVisible(row *ast.Row, transaction *Transaction,
 	// 其他情况都不可见
 	return false, nil
 }
+
+func (s *Serializer) Close() {
+	s.transactionManager.Close()
+}
