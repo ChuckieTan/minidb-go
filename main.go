@@ -87,4 +87,6 @@ func main() {
 	node2.SetIsLeaf(false)
 	node2.Decode(bytes.NewBuffer(raw))
 	fmt.Println(node2)
+	// tbm := tbm.Create("/tmp/test/")
+	// tbm.Begin()
 }

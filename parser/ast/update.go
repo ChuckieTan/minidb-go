@@ -6,7 +6,7 @@ type ColumnAssign struct {
 }
 
 type UpdateStatement struct {
-	TableSource      string
+	TableName        string
 	ColumnAssignList []ColumnAssign
 	Where            WhereStatement
 }

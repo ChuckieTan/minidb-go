@@ -32,8 +32,8 @@ func (columnDeine *ColumnDefine) SetColumnType(str string) {
 }
 
 type CreateTableStatement struct {
-	TableName       string
-	ColumnDeineList []ColumnDefine
+	TableName     string
+	ColumnDefines []ColumnDefine
 }
 
 func (statement CreateTableStatement) StatementType() string {

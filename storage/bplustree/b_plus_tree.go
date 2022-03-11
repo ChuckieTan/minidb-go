@@ -52,7 +52,7 @@ type BPlusTree struct {
 // return:
 // 		tree: b+树
 func NewTree(pager *p.Pager, keySize uint8, valueSize uint8,
-	tableId uint16, columnId uint16, rec *recovery.Recovery) (tree BPlusTree) {
+	tableId uint16, columnId uint16, rec *recovery.Recovery) *BPlusTree {
 	// order: 每个节点的最大项数，需要为偶数
 	order := uint16((util.PAGE_SIZE-1024)/uint16(keySize+valueSize)) / 2 * 2
 
@@ -66,6 +66,7 @@ func NewTree(pager *p.Pager, keySize uint8, valueSize uint8,
 	rootNode.Len = 0
 	rootNode.isLeaf = true
 
+	tree := new(BPlusTree)
 	tree.Root = rootNode.Addr
 	tree.FirstLeaf = rootNode.Addr
 	tree.LastLeaf = rootNode.Addr
@@ -81,7 +82,7 @@ func NewTree(pager *p.Pager, keySize uint8, valueSize uint8,
 	rootNode.Values = make([]index.ValueType, order+1)
 
 	tree.pager.Flush(rootPage)
-	return
+	return tree
 }
 
 func (tree *BPlusTree) RLock() {

@@ -11,7 +11,9 @@ import (
 type Row struct {
 	size   uint16
 	offset uint64
-	data   []SQLExprValue
+
+	columns []string
+	data    []SQLExprValue
 }
 
 func NewRow(data []SQLExprValue) *Row {

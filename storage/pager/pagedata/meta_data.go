@@ -9,25 +9,29 @@ import (
 )
 
 type TableInfo struct {
-	tableName string
-	tableId   uint16
+	TableName string
+	TableId   uint16
 
-	columnDefines []*ast.ColumnDefine
+	ColumnDefines []*ast.ColumnDefine
 
-	firstPageNum util.UUID
-	lastPageNum  util.UUID
+	FirstPageNum util.UUID
+	LastPageNum  util.UUID
 }
 
 func (ti *TableInfo) PrimaryKey() string {
-	return ti.columnDefines[0].Name
+	return ti.ColumnDefines[0].Name
 }
 
-func (ti *TableInfo) ColumnDefines() []*ast.ColumnDefine {
-	return ti.columnDefines
+func (ti *TableInfo) ColumnNames() []string {
+	columnNames := make([]string, 0)
+	for _, columnDefine := range ti.ColumnDefines {
+		columnNames = append(columnNames, columnDefine.Name)
+	}
+	return columnNames
 }
 
 func (ti *TableInfo) GetColumnDefine(columnName string) *ast.ColumnDefine {
-	for _, columnDefine := range ti.columnDefines {
+	for _, columnDefine := range ti.ColumnDefines {
 		if columnDefine.Name == columnName {
 			return columnDefine
 		}
@@ -35,38 +39,18 @@ func (ti *TableInfo) GetColumnDefine(columnName string) *ast.ColumnDefine {
 	return nil
 }
 
-func (ti *TableInfo) TableName() string {
-	return ti.tableName
-}
-
-func (ti *TableInfo) TableId() uint16 {
-	return ti.tableId
-}
-
-func (ti *TableInfo) FirstPageNum() util.UUID {
-	return ti.firstPageNum
-}
-
-func (ti *TableInfo) LastPageNum() util.UUID {
-	return ti.lastPageNum
-}
-
 func (ti *TableInfo) SetLastPageNum(uuid util.UUID) {
-	ti.lastPageNum = uuid
+	ti.LastPageNum = uuid
 }
 
 type MetaData struct {
-	version string
-	tables  map[string]*TableInfo
-}
-
-func (meta *MetaData) Version() string {
-	return meta.version
+	Version string
+	Tables  map[string]*TableInfo
 }
 
 func (meta *MetaData) GetTableInfo(tableName string) *TableInfo {
-	for _, table := range meta.tables {
-		if table.tableName == tableName {
+	for _, table := range meta.Tables {
+		if table.TableName == tableName {
 			return table
 		}
 	}
@@ -75,8 +59,8 @@ func (meta *MetaData) GetTableInfo(tableName string) *TableInfo {
 
 func NewMetaData() *MetaData {
 	return &MetaData{
-		version: util.VERSION,
-		tables:  make(map[string]*TableInfo, 0),
+		Version: util.VERSION,
+		Tables:  make(map[string]*TableInfo, 0),
 	}
 }
 

@@ -22,6 +22,7 @@ const (
 )
 
 func Create(path string) *Pager {
+	log.Info("create pager")
 	path = path + "/" + PAGE_FILE_NAME
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
@@ -33,6 +34,7 @@ func Create(path string) *Pager {
 
 	pager.cache = lru.NewLRU(util.PAGE_CACHE_CAP)
 
+	log.Info("create meta page")
 	// 初始化 meta page
 	metaData := pagedata.NewMetaData()
 	metaPage := pager.NewPage(metaData)
@@ -58,10 +60,14 @@ func Open(path string) *Pager {
 		log.Fatalf("get meta page failed: %v", err)
 	}
 	metaData := metaPage.data.(*pagedata.MetaData)
-	if metaData.Version() != util.VERSION {
+	if metaData.Version != util.VERSION {
 		log.Fatalf("version not match")
 	}
 	return pager
+}
+
+func (pager *Pager) PageFile() *os.File {
+	return pager.file
 }
 
 func (pager *Pager) SetCacheEviction(eviction cache.Eviction) {
@@ -77,9 +83,9 @@ func (pager *Pager) Select(spaceSize uint16, tableName string) (page *Page, err 
 	metaData := pager.GetMetaData()
 
 	table := metaData.GetTableInfo(tableName)
-	page, err = pager.GetPage(table.LastPageNum(), pagedata.NewRecordData())
+	page, err = pager.GetPage(table.LastPageNum, pagedata.NewRecordData())
 	if err != nil {
-		err = fmt.Errorf("meta page error, table '%v' last data page not found", table.TableName())
+		err = fmt.Errorf("meta page error, table '%v' last data page not found", table.TableName)
 		return
 	}
 

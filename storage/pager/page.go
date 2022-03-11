@@ -48,6 +48,8 @@ func newPage(pageNum util.UUID, pageData pagedata.PageData) *Page {
 		nextPageNum: NIL_PAGE_NUM,
 		prevPageNum: NIL_PAGE_NUM,
 
+		logs: make([]redolog.Log, 0),
+
 		data:     pageData,
 		dataCopy: pageData,
 	}
@@ -159,5 +161,5 @@ func (p *Page) AfterWrite() {
 }
 
 func (p *Page) Size() int {
-	return 4 + 4 + 4 + 1 + p.data.Size() + 1
+	return 4 + 8 + 4 + 4 + p.data.Size()
 }

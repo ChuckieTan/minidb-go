@@ -4,7 +4,6 @@ import (
 	"errors"
 	"minidb-go/parser/ast"
 	"minidb-go/storage"
-	"minidb-go/storage/recovery"
 	"minidb-go/tm"
 	"sync"
 )
@@ -22,8 +21,7 @@ type Serializer struct {
 	lock              sync.RWMutex
 }
 
-func Open(path string, rec *recovery.Recovery) *Serializer {
-	dataManager := storage.Open(path, rec)
+func Open(path string, dataManager *storage.DataManager) *Serializer {
 	transactionManager := tm.Open(path)
 	serializer := &Serializer{
 		transactionManager: transactionManager,
@@ -33,8 +31,7 @@ func Open(path string, rec *recovery.Recovery) *Serializer {
 	return serializer
 }
 
-func Create(path string, rec *recovery.Recovery) *Serializer {
-	dataManager := storage.Create(path, rec)
+func Create(path string, dataManager *storage.DataManager) *Serializer {
 	transactionManager := tm.Create(path)
 	serializer := &Serializer{
 		transactionManager: transactionManager,
@@ -80,9 +77,8 @@ func (s *Serializer) Abort(xid tm.XID) error {
 
 func (s *Serializer) Read(xid tm.XID, selectStmt *ast.SelectStatement) ([]*ast.Row, error) {
 	s.lock.RLock()
-	defer s.lock.RUnlock()
-
 	transaction, ok := s.activeTransaction[xid]
+	s.lock.RUnlock()
 	if !ok {
 		return nil, ErrXidNotExists
 	}
@@ -100,6 +96,50 @@ func (s *Serializer) Read(xid tm.XID, selectStmt *ast.SelectStatement) ([]*ast.R
 		if visible {
 			rows = append(rows, row)
 		}
+	}
+	return rows, nil
+}
+
+func (s *Serializer) Insert(xid tm.XID, insertStmt *ast.InsertIntoStatement) error {
+	s.lock.Lock()
+	_, ok := s.activeTransaction[xid]
+	s.lock.Unlock()
+	if !ok {
+		return ErrXidNotExists
+	}
+	insertStmt.Row = wrapData(insertStmt.Row, xid)
+	s.dataManager.InsertData(insertStmt)
+	return nil
+}
+
+func wrapData(row []ast.SQLExprValue, xid tm.XID) []ast.SQLExprValue {
+	xmin := ast.SQLInt(xid)
+	row = append(row, &xmin)
+	xmax := ast.SQLInt(tm.NIL_XID)
+	row = append(row, &xmax)
+	return row
+}
+
+func (s *Serializer) Delete(xid tm.XID, deleteStmt *ast.DeleteStatement) ([]*ast.Row, error) {
+	s.lock.RLock()
+	_, ok := s.activeTransaction[xid]
+	s.lock.RUnlock()
+	if !ok {
+		return nil, ErrXidNotExists
+	}
+	selectStmt := new(ast.SelectStatement)
+	selectStmt.ResultColumn = []string{"*"}
+	selectStmt.TableName = deleteStmt.TableName
+	selectStmt.Where = deleteStmt.Where
+	row_chan, err := s.dataManager.SelectData(selectStmt)
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]*ast.Row, 0)
+	for row := range row_chan {
+		row.SetXmax(xid)
+		s.dataManager.PageFile().WriteAt(row.Encode(), int64(row.Offset()))
+		rows = append(rows, row)
 	}
 	return rows, nil
 }
@@ -154,6 +194,7 @@ func isVisible(row *ast.Row, transaction *Transaction,
 		return false, nil
 	}
 	// 如果 Xmin 在当前事务开始前已经提交，并且开始时间小于当前事务，才有可能可见，否则不可见
+
 	// 如果当前数据没被删除，则可见
 	if !isDeleted {
 		return true, nil

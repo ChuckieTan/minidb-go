@@ -17,6 +17,7 @@ import (
 	"minidb-go/storage/recovery"
 	"minidb-go/storage/recovery/redo/redolog"
 	"minidb-go/util"
+	"os"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -58,6 +59,10 @@ func Open(path string, recovery *recovery.Recovery) *DataManager {
 		dm.recovery.Write(page)
 	})
 	return dm
+}
+
+func (dm *DataManager) PageFile() *os.File {
+	return dm.pager.PageFile()
 }
 
 func (dm *DataManager) getRecordData(pageNum util.UUID) *pagedata.RecordData {
@@ -111,7 +116,7 @@ func whereToFunc(tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) (
 		// 两个都是列名
 		columnNameL := string(*expr.Left.(*ast.SQLColumn))
 		columnNameR := string(*expr.Right.(*ast.SQLColumn))
-		columnDefines := tableInfo.ColumnDefines()
+		columnDefines := tableInfo.ColumnDefines
 		indexL, indexR := -1, -1
 		for i, columnDefine := range columnDefines {
 			if columnDefine.Name == columnNameL {
@@ -142,7 +147,7 @@ func whereToFunc(tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) (
 		}
 	} else if expr.Left.ValueType() == ast.SQL_COLUMN {
 		columnIndex := -1
-		for i, columnDefine := range tableInfo.ColumnDefines() {
+		for i, columnDefine := range tableInfo.ColumnDefines {
 			if columnDefine.Name == string(*expr.Left.(*ast.SQLColumn)) {
 				columnIndex = i
 				break
@@ -290,7 +295,7 @@ func (dm *DataManager) fullScan(rows chan<- *ast.Row, tableInfo *pagedata.TableI
 		log.Errorf("whereToFunc failed: %v", err)
 		return
 	}
-	pageNum := tableInfo.FirstPageNum()
+	pageNum := tableInfo.FirstPageNum
 	for pageNum != 0 {
 		dm.traverseData(rows, pageNum, check)
 		var err error
@@ -324,6 +329,7 @@ func (dm *DataManager) InsertData(insertStatement *ast.InsertIntoStatement) {
 	row := ast.NewRow(insertStatement.Row)
 	// TODO: 检查字段是否存在
 	dataPage, err := dm.pager.Select(row.Size(), insertStatement.TableName)
+	row.SetOffset(uint64(dataPage.Size()))
 	if err != nil {
 		log.Errorf("table %s not exist", insertStatement.TableName)
 		return
@@ -336,7 +342,7 @@ func (dm *DataManager) InsertData(insertStatement *ast.InsertIntoStatement) {
 	dataPage.AppendLog(redolog)
 	dm.recovery.Write(dataPage)
 
-	for i, columnDefine := range tableInfo.ColumnDefines() {
+	for i, columnDefine := range tableInfo.ColumnDefines {
 		index := columnDefine.Index
 		if index == nil {
 			continue

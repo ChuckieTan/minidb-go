@@ -1,8 +1,8 @@
 package ast
 
 type DeleteStatement struct {
-	TableSource string
-	Where       WhereStatement
+	TableName string
+	Where     WhereStatement
 }
 
 func (statement DeleteStatement) StatementType() string {

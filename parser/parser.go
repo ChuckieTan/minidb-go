@@ -92,9 +92,12 @@ func (parser *Parser) ParseCreateTableStatement() (
 		log.Error(err.Error())
 		return statement, err
 	}
+	i := uint16(0)
 	for {
 		define, err := parser.parseColumnDefine()
-		statement.ColumnDeineList = append(statement.ColumnDeineList, define)
+		define.ColumnId = i
+		i++
+		statement.ColumnDefines = append(statement.ColumnDefines, define)
 		if !parser.match(token.TT_COMMA) || err != nil {
 			break
 		}
@@ -182,14 +185,14 @@ func (parser *Parser) ParseSelectStatement() (
 	err error,
 ) {
 	if parser.match(token.TT_STAR) {
-		statement.ResultList = append(statement.ResultList, "*")
+		statement.ResultColumn = append(statement.ResultColumn, "*")
 	} else {
 		for {
 			name, err := parser.parseColumnName()
 			if err != nil {
 				return statement, err
 			}
-			statement.ResultList = append(statement.ResultList, name)
+			statement.ResultColumn = append(statement.ResultColumn, name)
 
 			if !parser.match(token.TT_COMMA) {
 				break
@@ -229,7 +232,7 @@ func (parser *Parser) ParseSelectStatement() (
 
 func (parser *Parser) ParseUpdateStatement() (
 	statement ast.UpdateStatement, err error) {
-	statement.TableSource, err = parser.parseTableName()
+	statement.TableName, err = parser.parseTableName()
 	if err != nil {
 		return
 	}
@@ -271,7 +274,7 @@ func (parser *Parser) ParseUpdateStatement() (
 func (parser *Parser) ParseDeleteStatement() (
 	statement ast.DeleteStatement, err error,
 ) {
-	statement.TableSource, err = parser.parseTableName()
+	statement.TableName, err = parser.parseTableName()
 	if err != nil {
 		return
 	}
