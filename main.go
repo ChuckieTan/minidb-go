@@ -3,8 +3,11 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"minidb-go/parser"
+	"minidb-go/parser/ast"
 	"minidb-go/storage/bplustree"
 	"minidb-go/storage/index"
+	"minidb-go/tbm"
 	"minidb-go/util"
 	"minidb-go/util/byteconv"
 	"os"
@@ -87,6 +90,12 @@ func main() {
 	node2.SetIsLeaf(false)
 	node2.Decode(bytes.NewBuffer(raw))
 	fmt.Println(node2)
-	// tbm := tbm.Create("/tmp/test/")
-	// tbm.Begin()
+	tbm := tbm.Create("/tmp/test/")
+	xid := tbm.Begin()
+	parser, _ := parser.NewParser("create table student (id int, name text);")
+	stmt, _ := parser.ParseStatement()
+	createStmt := stmt.(*ast.CreateTableStatement)
+	tbm.CreateTable(xid, createStmt)
+	// parser, _ := parser.NewParser("select * from student where id = 1;")
+
 }

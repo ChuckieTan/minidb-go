@@ -8,9 +8,9 @@ import (
 )
 
 func DeepCopy(dst, src interface{}) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	dec := gob.NewDecoder(&buf)
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	dec := gob.NewDecoder(buf)
 	if err := enc.Encode(src); err != nil {
 		log.Fatalf("encode failed: %v", err)
 	}

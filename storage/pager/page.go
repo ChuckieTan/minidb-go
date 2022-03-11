@@ -101,13 +101,15 @@ func (p *Page) PageNum() util.UUID {
 
 // 返回 Page 数据的二进制，PageSize的大小
 func (page *Page) Raw() []byte {
-	buff := bytes.NewBuffer(make([]byte, util.PAGE_SIZE))
+	buff := new(bytes.Buffer)
 	byteconv.Encode(buff, page.pageNum)
 	byteconv.Encode(buff, page.LSN)
 	byteconv.Encode(buff, page.nextPageNum)
 	byteconv.Encode(buff, page.prevPageNum)
 	dataByte := page.data.Encode()
 	buff.Write(dataByte)
+	zeroLen := util.PAGE_SIZE - buff.Len()
+	buff.Write(make([]byte, zeroLen))
 	return buff.Bytes()
 }
 

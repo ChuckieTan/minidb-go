@@ -141,7 +141,7 @@ func (node *BPlusTreeNode) Unlock() {
 }
 
 func (node *BPlusTreeNode) Encode() []byte {
-	buff := bytes.NewBuffer(make([]byte, 0))
+	buff := new(bytes.Buffer)
 	intBuff := make([]byte, 4)
 	binary.BigEndian.PutUint32(intBuff, uint32(node.Addr))
 	buff.Write(intBuff)

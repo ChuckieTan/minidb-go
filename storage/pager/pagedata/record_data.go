@@ -20,7 +20,7 @@ func NewRecordData() *RecordData {
 }
 
 func (r *RecordData) Encode() []byte {
-	buf := bytes.NewBuffer([]byte{})
+	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.BigEndian, r.size)
 	binary.Write(buf, binary.BigEndian, uint8(len(r.rows)))
 	for _, row := range r.rows {

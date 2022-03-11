@@ -39,26 +39,30 @@ type TransactionManager struct {
 	xidCounter XID
 }
 
-func Create(path string) (tm *TransactionManager) {
+func Create(path string) *TransactionManager {
 	path = path + "/" + XID_FILE_NAME
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		log.Fatal(err)
-		return
+		return nil
 	}
-	tm.file = file
-	tm.xidCounter = 1
-	return
+	tm := &TransactionManager{
+		file:       file,
+		xidCounter: 1,
+	}
+	return tm
 }
 
-func Open(path string) (tm *TransactionManager) {
+func Open(path string) *TransactionManager {
 	path = path + "/" + XID_FILE_NAME
 	file, err := os.OpenFile(path, os.O_RDWR, 0600)
 	if err != nil {
 		log.Fatal(err)
-		return
+		return nil
 	}
-	tm.file = file
+	tm := &TransactionManager{
+		file: file,
+	}
 	counterBytes := make([]byte, 4)
 	n, err := file.ReadAt(counterBytes, 0)
 	if n != 4 {
@@ -68,7 +72,7 @@ func Open(path string) (tm *TransactionManager) {
 		log.Fatal(err)
 	}
 	tm.xidCounter = XID(binary.BigEndian.Uint32(counterBytes))
-	return
+	return tm
 }
 
 func (tm *TransactionManager) Close() {

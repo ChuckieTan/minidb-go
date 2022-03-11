@@ -50,7 +50,7 @@ func (cache *LRU) Set(key interface{}, value interface{}) {
 	element := cache.cacheList.PushFront(&entry{key, value})
 	cache.cacheMap[key] = element
 
-	if cache.MaxEntries != 0 && cache.Len() > cache.MaxEntries {
+	if cache.MaxEntries != 0 && cache.cacheList.Len() > cache.MaxEntries {
 		cache.removeOldest()
 	}
 }

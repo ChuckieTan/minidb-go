@@ -43,7 +43,7 @@ type TableManager struct {
 func Create(path string) *TableManager {
 	pager := pager.Create(path)
 	rec := recovery.Create(path, pager.PageFile())
-	dataManager := storage.Create(path, rec)
+	dataManager := storage.Create(path, pager, rec)
 	serializer := serialization.Create(path, dataManager)
 	tbm := &TableManager{
 		metaData:   pager.GetMetaData(),
@@ -55,7 +55,7 @@ func Create(path string) *TableManager {
 func Open(path string) *TableManager {
 	pager := pager.Open(path)
 	rec := recovery.Open(path, pager.PageFile())
-	dataManager := storage.Open(path, rec)
+	dataManager := storage.Open(path, pager, rec)
 	serializer := serialization.Open(path, dataManager)
 	tbm := &TableManager{
 		metaData:   pager.GetMetaData(),

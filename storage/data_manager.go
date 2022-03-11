@@ -35,8 +35,7 @@ type DataManager struct {
 	//TODO: Data Cache，自适应哈希索引
 }
 
-func Create(path string, recovery *recovery.Recovery) *DataManager {
-	p := pager.Create(path)
+func Create(path string, p *pager.Pager, recovery *recovery.Recovery) *DataManager {
 	dm := &DataManager{
 		pager:    p,
 		recovery: recovery,
@@ -48,8 +47,7 @@ func Create(path string, recovery *recovery.Recovery) *DataManager {
 	return dm
 }
 
-func Open(path string, recovery *recovery.Recovery) *DataManager {
-	p := pager.Open(path)
+func Open(path string, p *pager.Pager, recovery *recovery.Recovery) *DataManager {
 	dm := &DataManager{
 		pager:    p,
 		recovery: recovery,

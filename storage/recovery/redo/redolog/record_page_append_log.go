@@ -43,7 +43,7 @@ func (log *RecordPageAppendLog) Type() LogType {
 }
 
 func (log *RecordPageAppendLog) Bytes() []byte {
-	buf := bytes.NewBuffer([]byte{})
+	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.BigEndian, log.Type())
 	gob.NewEncoder(buf).Encode(log)
 	return buf.Bytes()

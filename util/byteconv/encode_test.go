@@ -19,8 +19,8 @@ func BenchmarkEncode(b *testing.B) {
 		v[i].Y = math.MaxInt64
 	}
 	for i := 0; i < b.N; i++ {
-		buff := bytes.Buffer{}
-		byteconv.Encode(&buff, v)
+		buff := new(bytes.Buffer)
+		byteconv.Encode(buff, v)
 	}
 }
 
@@ -34,13 +34,13 @@ func BenchmarkGobEncode(b *testing.B) {
 		v[i].X = math.MaxInt64
 		v[i].Y = math.MaxInt64
 	}
-	var network bytes.Buffer
+	network := new(bytes.Buffer)
 	for i := 0; i < b.N; i++ {
-		network = bytes.Buffer{}
-		enc := gob.NewEncoder(&network)
+		enc := gob.NewEncoder(network)
 		enc.Encode(v)
+		network.Reset()
 	}
-	buff := bytes.Buffer{}
-	dec := gob.NewDecoder(&buff)
-	dec.Decode(&buff)
+	buff := new(bytes.Buffer)
+	dec := gob.NewDecoder(buff)
+	dec.Decode(buff)
 }

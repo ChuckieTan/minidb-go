@@ -57,7 +57,7 @@ func (log *BNodeSplitLog) Type() LogType {
 }
 
 func (log *BNodeSplitLog) Bytes() []byte {
-	buf := bytes.NewBuffer([]byte{})
+	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.BigEndian, log.Type())
 	gob.NewEncoder(buf).Encode(log)
 	return buf.Bytes()

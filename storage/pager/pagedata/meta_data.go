@@ -6,6 +6,8 @@ import (
 	"io"
 	"minidb-go/parser/ast"
 	"minidb-go/util"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type TableInfo struct {
@@ -65,10 +67,10 @@ func NewMetaData() *MetaData {
 }
 
 func (m *MetaData) Encode() []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(m)
+	buf := new(bytes.Buffer)
+	err := gob.NewEncoder(buf).Encode(m)
 	if err != nil {
+		log.Error("meta data encode failed: %v", err)
 		return nil
 	}
 	return buf.Bytes()

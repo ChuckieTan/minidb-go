@@ -64,7 +64,7 @@ func (log *BNodeInsertKVLog) Type() LogType {
 
 // 编码 B_NODE_INSERT_KV 日志
 func (log *BNodeInsertKVLog) Bytes() []byte {
-	buf := bytes.NewBuffer([]byte{})
+	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.BigEndian, log.Type())
 	gob.NewEncoder(buf).Encode(log)
 	return buf.Bytes()

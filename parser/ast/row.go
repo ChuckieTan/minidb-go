@@ -20,7 +20,7 @@ func NewRow(data []SQLExprValue) *Row {
 	row := &Row{
 		data: data,
 	}
-	buf := bytes.NewBuffer(make([]byte, 0))
+	buf := new(bytes.Buffer)
 	row.Decode(buf)
 	row.size = uint16(buf.Len())
 	return row
@@ -43,7 +43,7 @@ func (row *Row) Data() []SQLExprValue {
 }
 
 func (row *Row) Encode() []byte {
-	buf := bytes.NewBuffer(make([]byte, 0, row.size))
+	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.BigEndian, row.size)
 	binary.Write(buf, binary.BigEndian, row.offset)
 	binary.Write(buf, binary.BigEndian, uint8(len(row.data)))
