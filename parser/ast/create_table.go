@@ -31,11 +31,11 @@ func (columnDeine *ColumnDefine) SetColumnType(str string) {
 	columnDeine.Type = columnType
 }
 
-type CreateTableStatement struct {
+type CreateTableStmt struct {
 	TableName     string
-	ColumnDefines []ColumnDefine
+	ColumnDefines []*ColumnDefine
 }
 
-func (statement CreateTableStatement) StatementType() string {
+func (statement CreateTableStmt) StatementType() string {
 	return "Create table"
 }

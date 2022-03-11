@@ -48,6 +48,8 @@ func Create(path string) *TableManager {
 	tbm := &TableManager{
 		metaData:   pager.GetMetaData(),
 		serializer: serializer,
+		pager:      pager,
+		rec:        rec,
 	}
 	return tbm
 }
@@ -60,6 +62,8 @@ func Open(path string) *TableManager {
 	tbm := &TableManager{
 		metaData:   pager.GetMetaData(),
 		serializer: serializer,
+		pager:      pager,
+		rec:        rec,
 	}
 	return tbm
 }
@@ -76,7 +80,7 @@ func (tbm *TableManager) Abort(xid tm.XID) error {
 	return tbm.serializer.Abort(xid)
 }
 
-func (tbm *TableManager) Select(xid tm.XID, selectStmt *ast.SelectStatement) (*ResultList, error) {
+func (tbm *TableManager) Select(xid tm.XID, selectStmt ast.SelectStmt) (*ResultList, error) {
 	rows, err := tbm.serializer.Read(xid, selectStmt)
 	if err != nil {
 		return nil, err
@@ -84,7 +88,7 @@ func (tbm *TableManager) Select(xid tm.XID, selectStmt *ast.SelectStatement) (*R
 	return tbm.NewResultList(selectStmt.TableName, rows)
 }
 
-func (tbm *TableManager) Insert(xid tm.XID, insertStmt *ast.InsertIntoStatement) (*ResultList, error) {
+func (tbm *TableManager) Insert(xid tm.XID, insertStmt ast.InsertIntoStmt) (*ResultList, error) {
 	rows := []*ast.Row{ast.NewRow(insertStmt.Row)}
 	resultList, err := tbm.NewResultList(insertStmt.TableName, rows)
 	if err != nil {
@@ -93,7 +97,7 @@ func (tbm *TableManager) Insert(xid tm.XID, insertStmt *ast.InsertIntoStatement)
 	return resultList, tbm.serializer.Insert(xid, insertStmt)
 }
 
-func (tbm *TableManager) Delete(xid tm.XID, deleteStmt *ast.DeleteStatement) (*ResultList, error) {
+func (tbm *TableManager) Delete(xid tm.XID, deleteStmt ast.DeleteStatement) (*ResultList, error) {
 	rows, err := tbm.serializer.Delete(xid, deleteStmt)
 	if err != nil {
 		return nil, err
@@ -101,9 +105,9 @@ func (tbm *TableManager) Delete(xid tm.XID, deleteStmt *ast.DeleteStatement) (*R
 	return tbm.NewResultList(deleteStmt.TableName, rows)
 }
 
-func (tbm *TableManager) Update(xid tm.XID, updateStmt ast.UpdateStatement) (*ResultList, error) {
+func (tbm *TableManager) Update(xid tm.XID, updateStmt ast.UpdateStmt) (*ResultList, error) {
 	// 先删除对应的行
-	deleteStmt := &ast.DeleteStatement{
+	deleteStmt := ast.DeleteStatement{
 		TableName: updateStmt.TableName,
 		Where:     updateStmt.Where,
 	}
@@ -129,7 +133,7 @@ func (tbm *TableManager) Update(xid tm.XID, updateStmt ast.UpdateStatement) (*Re
 		for i, columnAssign := range updateStmt.ColumnAssignList {
 			insertValues[columnIds[i]] = columnAssign.Value
 		}
-		insertStmt := &ast.InsertIntoStatement{
+		insertStmt := ast.InsertIntoStmt{
 			TableName: updateStmt.TableName,
 			Row:       insertValues,
 		}
@@ -142,15 +146,22 @@ func (tbm *TableManager) Update(xid tm.XID, updateStmt ast.UpdateStatement) (*Re
 	return tbm.NewResultList(updateStmt.TableName, rows)
 }
 
-func (tbm *TableManager) CreateTable(xid tm.XID, createTableStmt *ast.CreateTableStatement) error {
+func (tbm *TableManager) CreateTable(xid tm.XID, createTableStmt ast.CreateTableStmt) error {
 	tableInfo := new(pagedata.TableInfo)
 	tableInfo.TableName = createTableStmt.TableName
 	tableInfo.TableId = uint16(len(tbm.metaData.Tables))
-	tableInfo.ColumnDefines = make([]*ast.ColumnDefine, len(createTableStmt.ColumnDefines))
+	tableInfo.ColumnDefines = createTableStmt.ColumnDefines
 
 	// 设置主键索引
 	tableInfo.ColumnDefines[0].Index = bplustree.NewTree(
 		tbm.pager, 8, 4, tableInfo.TableId, 0, tbm.rec,
 	)
+
+	// 初始化一个空数据页
+	page := tbm.pager.NewPage(pagedata.NewRecordData())
+	tableInfo.FirstPageNum = page.PageNum()
+	tableInfo.LastPageNum = page.PageNum()
+
+	tbm.metaData.AddTable(tableInfo)
 	return nil
 }

@@ -71,7 +71,7 @@ func (dm *DataManager) getRecordData(pageNum util.UUID) *pagedata.RecordData {
 	return recordPage.Data().(*pagedata.RecordData)
 }
 
-func (dm *DataManager) SelectData(selectStatement *ast.SelectStatement) (
+func (dm *DataManager) SelectData(selectStatement ast.SelectStmt) (
 	<-chan *ast.Row, error) {
 	rows := make(chan *ast.Row, 64)
 	metaData := dm.pager.GetMetaData()
@@ -317,7 +317,7 @@ func (dm *DataManager) traverseData(rows chan<- *ast.Row, pageNum util.UUID, che
 }
 
 // 插入数据
-func (dm *DataManager) InsertData(insertStatement *ast.InsertIntoStatement) {
+func (dm *DataManager) InsertData(insertStatement ast.InsertIntoStmt) {
 	metaData := dm.pager.GetMetaData()
 	tableInfo := metaData.GetTableInfo(insertStatement.TableName)
 	if tableInfo == nil {

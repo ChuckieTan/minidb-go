@@ -3,6 +3,7 @@ package pagedata
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"io"
 	"minidb-go/parser/ast"
 	"minidb-go/util"
@@ -59,6 +60,14 @@ func (meta *MetaData) GetTableInfo(tableName string) *TableInfo {
 	return nil
 }
 
+func (meta *MetaData) AddTable(tableInfo *TableInfo) error {
+	if meta.GetTableInfo(tableInfo.TableName) != nil {
+		return errors.New("table already exists")
+	}
+	meta.Tables[tableInfo.TableName] = tableInfo
+	return nil
+}
+
 func NewMetaData() *MetaData {
 	return &MetaData{
 		Version: util.VERSION,
@@ -70,7 +79,7 @@ func (m *MetaData) Encode() []byte {
 	buf := new(bytes.Buffer)
 	err := gob.NewEncoder(buf).Encode(m)
 	if err != nil {
-		log.Error("meta data encode failed: %v", err)
+		log.Error("meta data encode failed: ", err)
 		return nil
 	}
 	return buf.Bytes()

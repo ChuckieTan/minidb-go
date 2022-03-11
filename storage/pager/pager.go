@@ -22,7 +22,6 @@ const (
 )
 
 func Create(path string) *Pager {
-	log.Info("create pager")
 	path = path + "/" + PAGE_FILE_NAME
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
@@ -113,10 +112,8 @@ func (pager *Pager) NextPageNum(pageNum util.UUID) (util.UUID, error) {
 }
 
 func (pager *Pager) NewPage(pageData pagedata.PageData) *Page {
-	fileSize, err := pager.file.Seek(0, os.SEEK_END)
-	if err != nil {
-		log.Fatalf("seek file failed: %v", err)
-	}
+	stat, _ := pager.file.Stat()
+	fileSize := stat.Size()
 
 	pageNum := util.UUID(fileSize / util.PAGE_SIZE)
 	page := newPage(pageNum, pageData)

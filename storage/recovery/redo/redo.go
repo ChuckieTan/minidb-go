@@ -19,8 +19,12 @@ type Redo struct {
 	lock sync.RWMutex
 }
 
+const (
+	REDO_LOG_FILE_NAME = "redo.log"
+)
+
 func Create(path string, pageFile *os.File) *Redo {
-	path = path + "/redo.log"
+	path = path + "/" + REDO_LOG_FILE_NAME
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		log.Fatalf("open file %s failed: %v", path, err)
@@ -34,7 +38,7 @@ func Create(path string, pageFile *os.File) *Redo {
 }
 
 func Open(path string, pageFile *os.File) *Redo {
-	path = path + "/redo.log"
+	path = path + "/" + REDO_LOG_FILE_NAME
 	file, err := os.OpenFile(path, os.O_RDWR, 0666)
 	if err != nil {
 		log.Fatalf("open file %s failed: %v", path, err)

@@ -56,7 +56,10 @@ func NewTree(pager *p.Pager, keySize uint8, valueSize uint8,
 	// order: 每个节点的最大项数，需要为偶数
 	order := uint16((util.PAGE_SIZE-1024)/uint16(keySize+valueSize)) / 2 * 2
 
-	rootNode := newNode(order)
+	rootNode := &BPlusTreeNode{
+		Keys:   make([]index.KeyType, order),
+		Values: make([]index.ValueType, order+1),
+	}
 	rootPage := pager.NewPage(rootNode)
 	rootNode.page = rootPage
 	rootNode.Addr = rootPage.PageNum()
@@ -80,6 +83,7 @@ func NewTree(pager *p.Pager, keySize uint8, valueSize uint8,
 
 	rootNode.Keys = make([]index.KeyType, order)
 	rootNode.Values = make([]index.ValueType, order+1)
+	rootNode.tree = tree
 
 	tree.pager.Flush(rootPage)
 	return tree
@@ -116,13 +120,6 @@ func (tree *BPlusTree) Order() uint16 {
 	return tree.order
 }
 
-func (tree *BPlusTree) SetOrder(order uint16) {
-	tree.Lock()
-	defer tree.Unlock()
-
-	tree.order = order
-}
-
 func (tree *BPlusTree) KeySize() uint8 {
 	tree.RLock()
 	defer tree.RUnlock()
@@ -135,20 +132,6 @@ func (tree *BPlusTree) ValueSize() uint8 {
 	defer tree.RUnlock()
 
 	return tree.valueSize
-}
-
-func (tree *BPlusTree) SetKeySize(keySize uint8) {
-	tree.Lock()
-	defer tree.Unlock()
-
-	tree.keySize = keySize
-}
-
-func (tree *BPlusTree) SetValueSize(valueSize uint8) {
-	tree.Lock()
-	defer tree.Unlock()
-
-	tree.valueSize = valueSize
 }
 
 func bytesToUUID(bytes []byte) util.UUID {
@@ -167,7 +150,9 @@ func (tree *BPlusTree) getNode(pageNum util.UUID) (*BPlusTreeNode, error) {
 		tree: tree,
 	}
 	page, err := tree.pager.GetPage(pageNum, node)
+	node = page.Data().(*BPlusTreeNode)
 	node.page = page
+	node.tree = tree
 	return node, err
 }
 
@@ -201,6 +186,7 @@ func unlockNode(node *BPlusTreeNode, visit VisitType) {
 // 		index: 在节点中的下标
 func (tree *BPlusTree) searchLowerInTree(key index.KeyType, visit VisitType) (*BPlusTreeNode, uint16) {
 	node, err := tree.getNode(tree.Root)
+	// log.Info(node.Addr)
 	if err != nil {
 		log.Fatalf("tree root page load error: %v", err)
 	}
@@ -208,6 +194,9 @@ func (tree *BPlusTree) searchLowerInTree(key index.KeyType, visit VisitType) (*B
 	index := node.LowerBound(key)
 
 	for !node.isLeaf {
+		if node.Len == 0 {
+			break
+		}
 		index = node.LowerBound(key)
 		childNode, err := tree.getNode(bytesToUUID(node.Values[index]))
 		if err != nil {
@@ -317,7 +306,7 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 	defer unlockNode(node, Visit_Write)
 
 	if node.Addr == tree.Root {
-		newRoot := newNode(tree.order)
+		newRoot := newNode(tree)
 		rootPage := tree.pager.NewPage(newRoot)
 		newRoot.page = rootPage
 		newRoot.Addr = rootPage.PageNum()
@@ -333,7 +322,7 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 		tree.LastLeaf = node.Addr
 	}
 
-	newNode := newNode(tree.order)
+	newNode := newNode(tree)
 	newNodePage := tree.pager.NewPage(newNode)
 	newNode.page = newNodePage
 	newNode.Addr = newNodePage.PageNum()
@@ -390,7 +379,7 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 	defer unlockNode(node, Visit_Write)
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
 	if node.Addr == tree.Root {
-		newRoot := newNode(tree.order)
+		newRoot := newNode(tree)
 		newRootPage := tree.pager.NewPage(newRoot)
 		newRoot.page = newRootPage
 		newRoot.Addr = newRootPage.PageNum()
@@ -404,7 +393,7 @@ func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
 		tree.Root = newRoot.Addr
 	}
 
-	newNode := newNode(tree.order)
+	newNode := newNode(tree)
 	newNodePage := tree.pager.NewPage(newNode)
 	newNode.page = newNodePage
 	newNode.Addr = newNodePage.PageNum()

@@ -6,7 +6,6 @@ import (
 	"io"
 	"minidb-go/storage/pager/pagedata"
 	"minidb-go/storage/recovery/redo/redolog"
-	"minidb-go/tm"
 	"minidb-go/util"
 	"minidb-go/util/byteconv"
 	"sync"
@@ -35,8 +34,7 @@ type Page struct {
 
 	logs []redolog.Log
 
-	data     pagedata.PageData
-	dataCopy pagedata.PageData
+	data pagedata.PageData
 
 	rwlock sync.RWMutex
 }
@@ -50,8 +48,7 @@ func newPage(pageNum util.UUID, pageData pagedata.PageData) *Page {
 
 		logs: make([]redolog.Log, 0),
 
-		data:     pageData,
-		dataCopy: pageData,
+		data: pageData,
 	}
 }
 
@@ -86,7 +83,6 @@ func LoadPage(r io.Reader, pageData pagedata.PageData) (*Page, error) {
 	}
 	page.data = pageData
 	page.data.Decode(r)
-	page.dataCopy = page.data
 
 	if err != nil {
 		return nil, err
@@ -140,26 +136,6 @@ func (p *Page) PrevPageNum() util.UUID {
 
 func (p *Page) SetPrevPageNum(pageNum util.UUID) {
 	p.nextPageNum = pageNum
-}
-
-func (p *Page) BeforeRead() (XID tm.XID) {
-	p.rwlock.RLock()
-	util.DeepCopy(&p.dataCopy, &p.data)
-	return
-}
-
-func (p *Page) AfterRead() {
-	p.rwlock.RUnlock()
-}
-
-func (p *Page) BeforeWrite() (XID tm.XID) {
-	p.rwlock.Lock()
-	util.DeepCopy(&p.dataCopy, &p.data)
-	return
-}
-
-func (p *Page) AfterWrite() {
-	p.rwlock.Unlock()
 }
 
 func (p *Page) Size() int {

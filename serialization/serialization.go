@@ -75,7 +75,7 @@ func (s *Serializer) Abort(xid tm.XID) error {
 	return nil
 }
 
-func (s *Serializer) Read(xid tm.XID, selectStmt *ast.SelectStatement) ([]*ast.Row, error) {
+func (s *Serializer) Read(xid tm.XID, selectStmt ast.SelectStmt) ([]*ast.Row, error) {
 	s.lock.RLock()
 	transaction, ok := s.activeTransaction[xid]
 	s.lock.RUnlock()
@@ -100,7 +100,7 @@ func (s *Serializer) Read(xid tm.XID, selectStmt *ast.SelectStatement) ([]*ast.R
 	return rows, nil
 }
 
-func (s *Serializer) Insert(xid tm.XID, insertStmt *ast.InsertIntoStatement) error {
+func (s *Serializer) Insert(xid tm.XID, insertStmt ast.InsertIntoStmt) error {
 	s.lock.Lock()
 	_, ok := s.activeTransaction[xid]
 	s.lock.Unlock()
@@ -120,17 +120,18 @@ func wrapData(row []ast.SQLExprValue, xid tm.XID) []ast.SQLExprValue {
 	return row
 }
 
-func (s *Serializer) Delete(xid tm.XID, deleteStmt *ast.DeleteStatement) ([]*ast.Row, error) {
+func (s *Serializer) Delete(xid tm.XID, deleteStmt ast.DeleteStatement) ([]*ast.Row, error) {
 	s.lock.RLock()
 	_, ok := s.activeTransaction[xid]
 	s.lock.RUnlock()
 	if !ok {
 		return nil, ErrXidNotExists
 	}
-	selectStmt := new(ast.SelectStatement)
-	selectStmt.ResultColumn = []string{"*"}
-	selectStmt.TableName = deleteStmt.TableName
-	selectStmt.Where = deleteStmt.Where
+	selectStmt := ast.SelectStmt{
+		TableName:    deleteStmt.TableName,
+		Where:        deleteStmt.Where,
+		ResultColumn: []string{"*"},
+	}
 	row_chan, err := s.dataManager.SelectData(selectStmt)
 	if err != nil {
 		return nil, err

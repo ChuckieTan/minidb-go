@@ -26,8 +26,6 @@ type BPlusTreeNode struct {
 
 	isLeaf bool
 
-	order uint16
-
 	// 只在内存中使用，用于解码
 	tree *BPlusTree
 	page *pager.Page
@@ -35,11 +33,12 @@ type BPlusTreeNode struct {
 	lock sync.RWMutex
 }
 
-func newNode(order uint16) *BPlusTreeNode {
-	node := new(BPlusTreeNode)
-	node.order = order
-	node.Keys = make([]index.KeyType, order)
-	node.Values = make([]index.ValueType, order+1)
+func newNode(tree *BPlusTree) *BPlusTreeNode {
+	node := &BPlusTreeNode{
+		tree:   tree,
+		Keys:   make([]index.KeyType, tree.order),
+		Values: make([]index.ValueType, tree.order+1),
+	}
 	return node
 }
 
@@ -64,7 +63,7 @@ func compare(a, b index.KeyType) int {
 }
 
 func (node *BPlusTreeNode) needSplit() bool {
-	return node.Len > node.order-1
+	return node.Len > node.tree.order-1
 }
 
 // 可以插入重复的 Key
@@ -74,18 +73,18 @@ func (node *BPlusTreeNode) insertEntry(key index.KeyType, value index.ValueType)
 		node.tree.tableId, node.tree.columnId, node.Addr, key, value)
 	node.page.AppendLog(redolog)
 
+	order := node.tree.order
 	index := node.LowerBound(key)
-
 	// 插入 key
-	copy(node.Keys[index+1:], node.Keys[index:node.order-1])
+	copy(node.Keys[index+1:order], node.Keys[index:order-1])
 	node.Keys[index] = key
 
 	// 插入 value
 	if node.isLeaf {
-		copy(node.Values[index+1:], node.Values[index:node.order])
+		copy(node.Values[index+1:], node.Values[index:order])
 		node.Values[index] = value
 	} else {
-		copy(node.Values[index+2:], node.Values[index+1:node.order])
+		copy(node.Values[index+2:], node.Values[index+1:order])
 		node.Values[index+1] = value
 	}
 	node.Len++
@@ -142,32 +141,21 @@ func (node *BPlusTreeNode) Unlock() {
 
 func (node *BPlusTreeNode) Encode() []byte {
 	buff := new(bytes.Buffer)
-	intBuff := make([]byte, 4)
-	binary.BigEndian.PutUint32(intBuff, uint32(node.Addr))
-	buff.Write(intBuff)
-	binary.BigEndian.PutUint32(intBuff, uint32(node.Parent))
-	buff.Write(intBuff)
-	binary.BigEndian.PutUint32(intBuff, uint32(node.PreLeaf))
-	buff.Write(intBuff)
-	binary.BigEndian.PutUint32(intBuff, uint32(node.NextLeaf))
-	buff.Write(intBuff)
-
-	int16Buff := make([]byte, 2)
-	binary.BigEndian.PutUint16(int16Buff, node.Len)
-	buff.Write(int16Buff)
+	binary.Write(buff, binary.BigEndian, node.Addr)
+	binary.Write(buff, binary.BigEndian, node.Parent)
+	binary.Write(buff, binary.BigEndian, node.PreLeaf)
+	binary.Write(buff, binary.BigEndian, node.NextLeaf)
+	binary.Write(buff, binary.BigEndian, node.Len)
 
 	// 先编码 isLeaf，因为 Key 和 Value 都是变长的
-	if node.isLeaf {
-		buff.Write([]byte{1})
-	} else {
-		buff.Write([]byte{0})
-	}
+	binary.Write(buff, binary.BigEndian, node.isLeaf)
+
 	for i := 0; i < int(node.Len); i++ {
-		buff.Write(node.Keys[i][:])
-		buff.Write(node.Values[i][:])
+		buff.Write(node.Keys[i])
+		buff.Write(node.Values[i])
 	}
 	if !node.isLeaf {
-		buff.Write(node.Values[node.Len][:])
+		buff.Write(node.Values[node.Len])
 	}
 	return buff.Bytes()
 }
@@ -176,27 +164,14 @@ func (node *BPlusTreeNode) Decode(r io.Reader) error {
 	if node.tree == nil {
 		return errors.New("tree is nil")
 	}
-	intBuff := make([]byte, 4)
-	r.Read(intBuff)
-	node.Addr = util.UUID(binary.BigEndian.Uint32(intBuff))
-	r.Read(intBuff)
-	node.Parent = util.UUID(binary.BigEndian.Uint32(intBuff))
-	r.Read(intBuff)
-	node.PreLeaf = util.UUID(binary.BigEndian.Uint32(intBuff))
-	r.Read(intBuff)
-	node.NextLeaf = util.UUID(binary.BigEndian.Uint32(intBuff))
+	binary.Read(r, binary.BigEndian, &node.Addr)
+	binary.Read(r, binary.BigEndian, &node.Parent)
+	binary.Read(r, binary.BigEndian, &node.PreLeaf)
+	binary.Read(r, binary.BigEndian, &node.NextLeaf)
+	binary.Read(r, binary.BigEndian, &node.Len)
 
-	int16Buff := make([]byte, 2)
-	r.Read(int16Buff)
-	node.Len = binary.BigEndian.Uint16(int16Buff)
+	binary.Read(r, binary.BigEndian, &node.isLeaf)
 
-	isLeafByte := make([]byte, 1)
-	r.Read(isLeafByte)
-	if isLeafByte[0] == 1 {
-		node.isLeaf = true
-	} else {
-		node.isLeaf = false
-	}
 	if node.isLeaf {
 		node.Keys = make([]index.KeyType, int(node.tree.order))
 		node.Values = make([]index.ValueType, int(node.tree.order))
@@ -206,14 +181,14 @@ func (node *BPlusTreeNode) Decode(r io.Reader) error {
 	}
 	for i := 0; i < int(node.Len); i++ {
 		node.Keys[i] = make(index.KeyType, node.tree.KeySize())
-		r.Read(node.Keys[i][:])
+		r.Read(node.Keys[i])
 		node.Values[i] = make(index.ValueType, node.tree.ValueSize())
-		r.Read(node.Values[i][:])
+		r.Read(node.Values[i])
 	}
 
 	if !node.isLeaf {
 		node.Values[node.Len] = make(index.ValueType, node.tree.ValueSize())
-		r.Read(node.Values[node.Len][:])
+		r.Read(node.Values[node.Len])
 	}
 	return nil
 }

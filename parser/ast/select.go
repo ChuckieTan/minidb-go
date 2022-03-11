@@ -1,11 +1,11 @@
 package ast
 
-type SelectStatement struct {
+type SelectStmt struct {
 	ResultColumn []string
 	TableName    string
 	Where        WhereStatement
 }
 
-func (statement SelectStatement) StatementType() string {
+func (statement SelectStmt) StatementType() string {
 	return "Select"
 }

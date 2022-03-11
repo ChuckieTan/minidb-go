@@ -31,6 +31,7 @@ func Create(path string) *RecoveryInfo {
 	if err != nil {
 		log.Fatalf("open file %s failed: %v", path, err)
 	}
+	file.WriteAt([]byte{0, 0}, 0)
 	return &RecoveryInfo{
 		infoFile: file,
 	}

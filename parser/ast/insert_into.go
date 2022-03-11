@@ -1,10 +1,10 @@
 package ast
 
-type InsertIntoStatement struct {
+type InsertIntoStmt struct {
 	TableName string
 	Row       []SQLExprValue
 }
 
-func (statement InsertIntoStatement) StatementType() string {
+func (statement InsertIntoStmt) StatementType() string {
 	return "Insert into"
 }

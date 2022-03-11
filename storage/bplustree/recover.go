@@ -15,16 +15,17 @@ func (tree *BPlusTree) RecoverInsertKV(log *redolog.BNodeInsertKVLog) error {
 	}
 	index := node.LowerBound(key)
 
+	order := tree.order
 	// 插入 key
-	copy(node.Keys[index+1:], node.Keys[index:node.order-1])
+	copy(node.Keys[index+1:], node.Keys[index:order-1])
 	node.Keys[index] = key
 
 	// 插入 value
 	if node.isLeaf {
-		copy(node.Values[index+1:], node.Values[index:node.order])
+		copy(node.Values[index+1:], node.Values[index:order])
 		node.Values[index] = value
 	} else {
-		copy(node.Values[index+2:], node.Values[index+1:node.order])
+		copy(node.Values[index+2:], node.Values[index+1:order])
 		node.Values[index+1] = value
 	}
 	node.Len++
@@ -67,7 +68,7 @@ func (tree *BPlusTree) recoverSplitLeafNode(page *pager.Page, nextPage *pager.Pa
 	nextNode := nextPage.Data().(*BPlusTreeNode)
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
 	if node.Addr == tree.Root {
-		newRoot := newNode(tree.order)
+		newRoot := newNode(tree)
 		rootPage := tree.pager.NewPage(newRoot)
 		newRoot.page = rootPage
 		newRoot.Addr = rootPage.PageNum()
@@ -132,7 +133,7 @@ func (tree *BPlusTree) recoverSplitNonLeafNode(page *pager.Page, nextPage *pager
 	node := page.Data().(*BPlusTreeNode)
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
 	if node.Addr == tree.Root {
-		newRoot := newNode(tree.order)
+		newRoot := newNode(tree)
 		newRootPage := tree.pager.NewPage(newRoot)
 		newRoot.page = newRootPage
 		newRoot.Addr = newRootPage.PageNum()

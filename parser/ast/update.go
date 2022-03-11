@@ -5,12 +5,12 @@ type ColumnAssign struct {
 	Value      SQLExprValue
 }
 
-type UpdateStatement struct {
+type UpdateStmt struct {
 	TableName        string
 	ColumnAssignList []ColumnAssign
 	Where            WhereStatement
 }
 
-func (statement UpdateStatement) StatementType() string {
+func (statement UpdateStmt) StatementType() string {
 	return "Update"
 }
