@@ -10,14 +10,13 @@ import (
 	"minidb-go/storage/pager/pagedata"
 	"minidb-go/storage/recovery"
 	"minidb-go/tm"
-	"minidb-go/util"
 )
 
 var ErrTableNotExists = errors.New("Table not exists")
 
 type ResultList struct {
-	columns []string
-	rows    []*ast.Row
+	Columns []string
+	Rows    []*ast.Row
 }
 
 func (tbm *TableManager) NewResultList(tableName string, rows []*ast.Row) (*ResultList, error) {
@@ -27,8 +26,8 @@ func (tbm *TableManager) NewResultList(tableName string, rows []*ast.Row) (*Resu
 	}
 	columns := tableInfo.ColumnNames()
 	return &ResultList{
-		columns: columns,
-		rows:    rows,
+		Columns: columns,
+		Rows:    rows,
 	}, nil
 }
 
@@ -128,8 +127,7 @@ func (tbm *TableManager) Update(xid tm.XID, updateStmt ast.UpdateStmt) (*ResultL
 
 	rows := make([]*ast.Row, 0)
 	for _, row := range old_rows {
-		insertValues := make([]ast.SQLExprValue, 0)
-		util.DeepCopy(&insertValues, row.Data())
+		insertValues := row.DeepCopyData()
 		for i, columnAssign := range updateStmt.ColumnAssignList {
 			insertValues[columnIds[i]] = columnAssign.Value
 		}

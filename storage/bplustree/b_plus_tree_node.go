@@ -45,7 +45,7 @@ func newNode(tree *BPlusTree) *BPlusTreeNode {
 func (node *BPlusTreeNode) UpperBound(key index.KeyType) uint16 {
 	index := sort.Search(
 		int(node.Len),
-		func(i int) bool { return compare(node.Keys[i], key) > 0 },
+		func(i int) bool { return bytes.Compare(node.Keys[i], key) > 0 },
 	)
 	return uint16(index)
 }
@@ -53,13 +53,9 @@ func (node *BPlusTreeNode) UpperBound(key index.KeyType) uint16 {
 func (node *BPlusTreeNode) LowerBound(key index.KeyType) uint16 {
 	index := sort.Search(
 		int(node.Len),
-		func(i int) bool { return compare(node.Keys[i], key) >= 0 },
+		func(i int) bool { return bytes.Compare(node.Keys[i], key) >= 0 },
 	)
 	return uint16(index)
-}
-
-func compare(a, b index.KeyType) int {
-	return bytes.Compare(a[:], b[:])
 }
 
 func (node *BPlusTreeNode) needSplit() bool {

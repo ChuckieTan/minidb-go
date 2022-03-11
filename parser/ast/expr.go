@@ -29,6 +29,8 @@ type SQLExprValue interface {
 	Raw() []byte
 	Encode(w io.Writer)
 	Decode(r io.Reader)
+	String() string
+	DeepCopy() SQLExprValue
 }
 
 func (sqlInt *SQLInt) isExpr() bool {
@@ -118,6 +120,60 @@ func (sqlColumn *SQLColumn) Decode(r io.Reader) {
 	*sqlColumn = SQLColumn(buf)
 }
 
+func (sqlInt *SQLInt) String() string {
+	return fmt.Sprint(*sqlInt)
+}
+
+func (sqlFloat *SQLFloat) String() string {
+	return fmt.Sprintf("%f", *sqlFloat)
+}
+
+func (sqlText *SQLText) String() string {
+	return fmt.Sprint(*sqlText)
+}
+
+func (sqlColumn *SQLColumn) String() string {
+	return fmt.Sprint(*sqlColumn)
+}
+
+func (sqlInt *SQLInt) DeepCopy() SQLExprValue {
+	val := SQLInt(*sqlInt)
+	return &val
+}
+
+func (sqlFloat *SQLFloat) DeepCopy() SQLExprValue {
+	val := SQLFloat(*sqlFloat)
+	return &val
+}
+
+func (sqlText *SQLText) DeepCopy() SQLExprValue {
+	val := SQLText(*sqlText)
+	return &val
+}
+
+func (sqlColumn *SQLColumn) DeepCopy() SQLExprValue {
+	val := SQLColumn(*sqlColumn)
+	return &val
+}
+
+func SQLValueEqual(left, right SQLExprValue) bool {
+	if left.ValueType() != right.ValueType() {
+		return false
+	}
+	switch left.ValueType() {
+	case SQL_INT:
+		return *left.(*SQLInt) == *right.(*SQLInt)
+	case SQL_FLOAT:
+		return *left.(*SQLFloat) == *right.(*SQLFloat)
+	case SQL_TEXT:
+		return *left.(*SQLText) == *right.(*SQLText)
+	case SQL_COLUMN:
+		return *left.(*SQLColumn) == *right.(*SQLColumn)
+	default:
+		return false
+	}
+}
+
 func decodeExprValue(r io.Reader) (SQLExprValue, error) {
 	var valueType SQLValueType
 	if err := binary.Read(r, binary.BigEndian, &valueType); err != nil {
@@ -152,5 +208,9 @@ type SQLExpr struct {
 }
 
 func (expr SQLExpr) IsEqual() bool {
-	return expr.Op == token.TT_EQUAL
+	return expr.Op == token.TT_ASSIGN || expr.Op == token.TT_EQUAL
+}
+
+func (expr SQLExpr) String() string {
+	return fmt.Sprintf("(%s %s %s)", expr.Left, expr.Op, expr.Right)
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"minidb-go/tm"
 )
@@ -20,9 +21,7 @@ func NewRow(data []SQLExprValue) *Row {
 	row := &Row{
 		data: data,
 	}
-	buf := new(bytes.Buffer)
-	row.Decode(buf)
-	row.size = uint16(buf.Len())
+	row.size = uint16(len(row.Encode()))
 	return row
 }
 
@@ -40,6 +39,25 @@ func (row *Row) Size() uint16 {
 
 func (row *Row) Data() []SQLExprValue {
 	return row.data
+}
+
+func (row *Row) DeepCopyData() []SQLExprValue {
+	data := make([]SQLExprValue, len(row.data))
+	for i, v := range row.data {
+		data[i] = v.DeepCopy()
+	}
+	return data
+}
+
+func (row *Row) String() string {
+	var buf bytes.Buffer
+	buf.WriteString("'")
+	for i := 0; i < len(row.data)-1; i++ {
+		buf.WriteString(fmt.Sprintf("%s ", row.data[i].String()))
+	}
+	buf.WriteString(row.data[len(row.data)-1].String())
+	buf.WriteString("'")
+	return buf.String()
 }
 
 func (row *Row) Encode() []byte {

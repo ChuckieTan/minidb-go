@@ -63,9 +63,9 @@ func NewTree(pager *p.Pager, keySize uint8, valueSize uint8,
 	rootPage := pager.NewPage(rootNode)
 	rootNode.page = rootPage
 	rootNode.Addr = rootPage.PageNum()
-	rootNode.Parent = 0
-	rootNode.PreLeaf = 0
-	rootNode.NextLeaf = 0
+	rootNode.Parent = p.NIL_PAGE_NUM
+	rootNode.PreLeaf = p.NIL_PAGE_NUM
+	rootNode.NextLeaf = p.NIL_PAGE_NUM
 	rootNode.Len = 0
 	rootNode.isLeaf = true
 
@@ -232,8 +232,8 @@ func (tree *BPlusTree) searchUpperInTree(key index.KeyType, visit VisitType) (*B
 func (tree *BPlusTree) Search(key index.KeyType) <-chan index.ValueType {
 	valueChan := make(chan index.ValueType, 64)
 
-	leafNode, index := tree.searchLowerInTree(key, true)
-	if uint16(index) == leafNode.Len || compare(leafNode.Keys[index], key) != 0 {
+	leafNode, index := tree.searchLowerInTree(key, Visit_Read)
+	if uint16(index) == leafNode.Len || !bytes.Equal(leafNode.Keys[index], key) {
 		close(valueChan)
 		unlockNode(leafNode, Visit_Read)
 		return valueChan
@@ -244,7 +244,7 @@ func (tree *BPlusTree) Search(key index.KeyType) <-chan index.ValueType {
 		defer close(valueChan)
 		currentIndex := index
 		for {
-			for currentIndex < leafNode.Len && compare(leafNode.Keys[currentIndex-1], key) == 0 {
+			for currentIndex < leafNode.Len && bytes.Equal(leafNode.Keys[currentIndex], key) {
 				currentValue := leafNode.Values[currentIndex]
 				valueChan <- currentValue
 				currentIndex++
@@ -252,7 +252,7 @@ func (tree *BPlusTree) Search(key index.KeyType) <-chan index.ValueType {
 			// 如果循环到当前 node 的最后一个 Value，则尝试获取下一个 node
 			if currentIndex == leafNode.Len {
 				// 如果当前 node 是最后一个 node，则退出循环
-				if leafNode.NextLeaf == 0 {
+				if leafNode.NextLeaf == p.NIL_PAGE_NUM {
 					break
 				}
 				nextLeafNode, err := tree.getNode(leafNode.NextLeaf)
@@ -279,7 +279,7 @@ func (tree *BPlusTree) Insert(key index.KeyType, value index.ValueType) error {
 	// 如果已经存在相同的 (key, value), 则直接返回
 	valueChan := tree.Search(key)
 	for treeValue := range valueChan {
-		if bytes.Equal(treeValue[:], value[:]) {
+		if bytes.Equal(treeValue, value) {
 			return nil
 		}
 	}

@@ -235,6 +235,15 @@ func (dm *DataManager) equalSearch(rows chan<- *ast.Row, tableInfo *pagedata.Tab
 	}
 }
 
+func checkValueFunc(value ast.SQLExprValue) func(*ast.Row) bool {
+	return func(row *ast.Row) bool {
+		if len(row.Data()) == 0 {
+			return false
+		}
+		return ast.SQLValueEqual(row.Data()[0], value)
+	}
+}
+
 func (dm *DataManager) primaryKeyEqualSearch(rows chan<- *ast.Row, primaryIndex index.Index, value ast.SQLExprValue) {
 	valueChan := primaryIndex.Search(value.Raw())
 	w := sync.WaitGroup{}
@@ -244,9 +253,7 @@ func (dm *DataManager) primaryKeyEqualSearch(rows chan<- *ast.Row, primaryIndex 
 			defer w.Done()
 			for pageNumBytes := range valueChan {
 				pageNum := util.BytesToUUID(pageNumBytes)
-				dm.traverseData(rows, pageNum, func(row *ast.Row) bool {
-					return row.Data()[0] == value
-				})
+				dm.traverseData(rows, pageNum, checkValueFunc(value))
 			}
 		}()
 	}
@@ -271,9 +278,7 @@ func (dm *DataManager) simpleEqualSearch(rows chan<- *ast.Row, simpleIndex index
 				pageNumChan := primaryIndex.Search(index.KeyType(primaryKeyBytes))
 				for pageNumBytes := range pageNumChan {
 					pageNum := util.BytesToUUID(pageNumBytes)
-					dm.traverseData(rows, pageNum, func(row *ast.Row) bool {
-						return row.Data()[0] == value
-					})
+					dm.traverseData(rows, pageNum, checkValueFunc(value))
 				}
 			}
 		}()

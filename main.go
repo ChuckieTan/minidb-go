@@ -24,6 +24,10 @@ func init() {
 
 	// 注册 gob 接口类型
 	gob.Register(bplustree.BPlusTree{})
+	gob.Register(ast.SQLInt(0))
+	gob.Register(ast.SQLFloat(0))
+	gob.Register(ast.SQLText(""))
+	gob.Register(ast.SQLColumn(""))
 }
 
 func main() {
@@ -59,5 +63,4 @@ func main() {
 	fmt.Println(result, err)
 
 	tbm.Commit(xid)
-
 }

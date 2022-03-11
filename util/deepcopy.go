@@ -3,8 +3,7 @@ package util
 import (
 	"bytes"
 	"encoding/gob"
-
-	log "github.com/sirupsen/logrus"
+	"log"
 )
 
 func DeepCopy(dst, src interface{}) {
