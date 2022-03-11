@@ -149,6 +149,10 @@ func (tbm *TableManager) Update(xid tm.XID, updateStmt ast.UpdateStmt) (*ResultL
 }
 
 func (tbm *TableManager) CreateTable(xid tm.XID, createTableStmt ast.CreateTableStmt) error {
+	if _, ok := tbm.metaData.Tables[createTableStmt.TableName]; ok {
+		return errors.New("table already exists")
+	}
+
 	tableInfo := new(pagedata.TableInfo)
 	tableInfo.TableName = createTableStmt.TableName
 	tableInfo.TableId = uint16(len(tbm.metaData.Tables))
@@ -164,8 +168,8 @@ func (tbm *TableManager) CreateTable(xid tm.XID, createTableStmt ast.CreateTable
 	tableInfo.FirstPageNum = page.PageNum()
 	tableInfo.LastPageNum = page.PageNum()
 
-	tbm.metaData.AddTable(tableInfo)
-	return nil
+	err := tbm.metaData.AddTable(tableInfo)
+	return err
 }
 
 func (tbm *TableManager) Close() {
