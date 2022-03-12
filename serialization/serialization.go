@@ -3,8 +3,8 @@ package serialization
 import (
 	"errors"
 	"minidb-go/parser/ast"
+	"minidb-go/serialization/tm"
 	"minidb-go/storage"
-	"minidb-go/tm"
 	"sync"
 )
 

@@ -1,6 +1,6 @@
 package serialization
 
-import "minidb-go/tm"
+import "minidb-go/serialization/tm"
 
 type Transaction struct {
 	xid      tm.XID

@@ -1,7 +1,7 @@
 package lru_test
 
 import (
-	"minidb-go/util/lru"
+	"minidb-go/util/cache/lru"
 	"testing"
 )
 

@@ -4,12 +4,12 @@ import (
 	"errors"
 	"minidb-go/parser/ast"
 	"minidb-go/serialization"
+	"minidb-go/serialization/tm"
 	"minidb-go/storage"
 	"minidb-go/storage/bplustree"
 	"minidb-go/storage/pager"
 	"minidb-go/storage/pager/pagedata"
 	"minidb-go/storage/recovery"
-	"minidb-go/tm"
 )
 
 var ErrTableNotExists = errors.New("Table not exists")

@@ -6,7 +6,7 @@ import (
 	"minidb-go/storage/pager/pagedata"
 	"minidb-go/util"
 	"minidb-go/util/cache"
-	"minidb-go/util/lru"
+	"minidb-go/util/cache/lru"
 	"os"
 
 	log "github.com/sirupsen/logrus"
