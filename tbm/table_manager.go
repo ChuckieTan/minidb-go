@@ -91,12 +91,13 @@ func (tbm *TableManager) Select(xid tm.XID, selectStmt ast.SelectStmt) (*ResultL
 }
 
 func (tbm *TableManager) Insert(xid tm.XID, insertStmt ast.InsertIntoStmt) (*ResultList, error) {
-	rows := []*ast.Row{ast.NewRow(insertStmt.Row)}
-	resultList, err := tbm.NewResultList(insertStmt.TableName, rows)
+	values, err := tbm.serializer.Insert(xid, insertStmt)
 	if err != nil {
 		return nil, err
 	}
-	return resultList, tbm.serializer.Insert(xid, insertStmt)
+	rows := []*ast.Row{ast.NewRow(values)}
+	resultList, err := tbm.NewResultList(insertStmt.TableName, rows)
+	return resultList, nil
 }
 
 func (tbm *TableManager) Delete(xid tm.XID, deleteStmt ast.DeleteStatement) (*ResultList, error) {
@@ -139,8 +140,8 @@ func (tbm *TableManager) Update(xid tm.XID, updateStmt ast.UpdateStmt) (*ResultL
 			TableName: updateStmt.TableName,
 			Row:       insertValues,
 		}
-		err := tbm.serializer.Insert(xid, insertStmt)
-		rows = append(rows, ast.NewRow(insertValues))
+		values, err := tbm.serializer.Insert(xid, insertStmt)
+		rows = append(rows, ast.NewRow(values))
 		if err != nil {
 			return nil, err
 		}

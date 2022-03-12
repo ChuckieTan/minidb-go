@@ -51,12 +51,12 @@ func (row *Row) DeepCopyData() []SQLExprValue {
 
 func (row *Row) String() string {
 	var buf bytes.Buffer
-	buf.WriteString("'")
-	for i := 0; i < len(row.data)-1; i++ {
+	// buf.WriteString("'")
+	for i := 0; i < len(row.data)-3; i++ {
 		buf.WriteString(fmt.Sprintf("%s ", row.data[i].String()))
 	}
-	buf.WriteString(row.data[len(row.data)-1].String())
-	buf.WriteString("'")
+	buf.WriteString(row.data[len(row.data)-3].String())
+	// buf.WriteString("'")
 	return buf.String()
 }
 

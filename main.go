@@ -36,8 +36,8 @@ func main() {
 	sql2 := "select * from student where id = 1;"
 	sql3 := "update student set id = 1, name = 'sam' where id = 1;"
 
-	// tbm := tbm.Create("/tmp/test/")
-	tbm := tbm.Open("/tmp/test/")
+	tbm := tbm.Create("/tmp/test/")
+	// tbm := tbm.Open("/tmp/test/")
 	xid := tbm.Begin()
 	p, _ := parser.NewParser(sql0)
 	stmt, _ := p.ParseStatement()

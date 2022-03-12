@@ -100,16 +100,16 @@ func (s *Serializer) Read(xid tm.XID, selectStmt ast.SelectStmt) ([]*ast.Row, er
 	return rows, nil
 }
 
-func (s *Serializer) Insert(xid tm.XID, insertStmt ast.InsertIntoStmt) error {
+func (s *Serializer) Insert(xid tm.XID, insertStmt ast.InsertIntoStmt) ([]ast.SQLExprValue, error) {
 	s.lock.Lock()
 	_, ok := s.activeTransaction[xid]
 	s.lock.Unlock()
 	if !ok {
-		return ErrXidNotExists
+		return nil, ErrXidNotExists
 	}
 	insertStmt.Row = wrapData(insertStmt.Row, xid)
 	s.dataManager.InsertData(insertStmt)
-	return nil
+	return insertStmt.Row, nil
 }
 
 func wrapData(row []ast.SQLExprValue, xid tm.XID) []ast.SQLExprValue {
