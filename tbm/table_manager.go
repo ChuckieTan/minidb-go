@@ -2,6 +2,7 @@ package tbm
 
 import (
 	"errors"
+	"fmt"
 	"minidb-go/parser/ast"
 	"minidb-go/serialization"
 	"minidb-go/serialization/tm"
@@ -17,6 +18,22 @@ var ErrTableNotExists = errors.New("Table not exists")
 type ResultList struct {
 	Columns []string
 	Rows    []*ast.Row
+}
+
+func (result *ResultList) String() string {
+	if len(result.Columns) == 0 {
+		return "\n"
+	}
+	str := ""
+	for _, column := range result.Columns {
+		str += column + "\t"
+	}
+	str += "\n"
+	for _, row := range result.Rows {
+		str += fmt.Sprintf("%s\n", row)
+	}
+	str += "\n"
+	return str
 }
 
 func (tbm *TableManager) NewResultList(tableName string, rows []*ast.Row) (*ResultList, error) {

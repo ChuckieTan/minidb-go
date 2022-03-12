@@ -59,7 +59,7 @@ func (record *RecordData) Size() int {
 
 func (record *RecordData) Append(rows *ast.Row) {
 	record.rows = append(record.rows, rows)
-	record.size += rows.Size()
+	record.size += rows.Size
 }
 
 func (record *RecordData) PageDataType() PageDataType {

@@ -13,5 +13,5 @@ type Request struct {
 type Response struct {
 	Xid        tm.XID
 	ResultList *tbm.ResultList
-	Err        error
+	Err        string
 }

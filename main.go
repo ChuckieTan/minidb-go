@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/gob"
+	"flag"
 	"fmt"
-	"minidb-go/parser"
+	"minidb-go/client"
 	"minidb-go/parser/ast"
+	"minidb-go/server"
 	"minidb-go/storage/bplustree"
 	"minidb-go/tbm"
 	"minidb-go/util"
@@ -30,46 +32,106 @@ func init() {
 	gob.Register(ast.SQLColumn(""))
 }
 
+// func main() {
+// 	// 创建数据库
+// 	db := tbm.Create("test.db")
+// 	// 创建表
+// 	table := db.CreateTable("user")
+// 	// 创建索引
+// 	index := table.CreateIndex("idx_name", "name")
+// 	// 创建索引
+// 	index = table.CreateIndex("idx_age", "age")
+// 	// 创建索引
+// 	index = table.CreateIndex("idx_score", "score")
+// 	// 创建索引
+// 	index = table.CreateIndex("idx_score_age", "score", "age")
+// 	// 创建索引
+// 	index = table.CreateIndex("idx_score_age_name", "score", "age", "name")
+
+// 	// 插入数据
+// 	table.Insert(1, "张三", 18, 100.0)
+// 	table.Insert(2, "李四", 19, 99.0)
+// 	table.Insert(3, "王五", 20, 98.0)
+// 	table.Insert(4, "赵六", 21, 97.0)
+// 	table.Insert(5, "钱七", 22, 96.0)
+// 	table.Insert(6, "孙八", 23, 95.0)
+// 	table.Insert(7, "周九", 24, 94.0)
+// 	table.Insert(8, "吴十", 25, 93.0)
+// 	table.Insert(9, "郑十一", 26, 92.0)
+// 	table.Insert(10, "王十二", 27, 91.0)
+// 	table.Insert(11, "李十三", 28, 90.0)
+// 	table.Insert(12, "张十四", 29, 89.0)
+// 	table.Insert(13, "李十五", 30, 88.0)
+// }
+
 func main() {
-	sql0 := "create table student (id int, name text);"
-	sql1 := "insert into student values (1, 'tom');"
-	sql2 := "select * from student where id = 1;"
-	sql3 := "update student set id = 1, name = 'sam' where id = 1;"
+	isServer := flag.Bool("server", false, "run as server")
+	isClient := flag.Bool("client", false, "run as client")
+	isCreate := flag.Bool("create", false, "create database")
+	isOpen := flag.Bool("open", false, "open database")
+	path := flag.String("path", "", "database path")
+	flag.Parse()
 
-	tbm := tbm.Create("/tmp/test/")
-	// tbm := tbm.Open("/tmp/test/")
-	xid := tbm.Begin()
-	p, _ := parser.NewParser(sql0)
-	stmt, _ := p.ParseStatement()
-	createStmt := stmt.(ast.CreateTableStmt)
-	err := tbm.CreateTable(xid, createStmt)
-	fmt.Println(err)
+	if *isServer == *isClient {
+		log.Fatal("server and client can't be both true")
+	}
 
-	p, _ = parser.NewParser(sql1)
-	stmt, _ = p.ParseStatement()
-	insertStmt := stmt.(ast.InsertIntoStmt)
-	result, err := tbm.Insert(xid, insertStmt)
-	fmt.Println(result, err)
+	if *isServer {
+		if *isCreate == *isOpen {
+			log.Fatal("create and open can't be both true")
+		}
 
-	p, _ = parser.NewParser(sql2)
-	stmt, _ = p.ParseStatement()
-	selectStmt := stmt.(ast.SelectStmt)
-	result, err = tbm.Select(xid, selectStmt)
-	fmt.Println(result, err)
+		log.Info("run as server")
+		var tableManager *tbm.TableManager
+		if *isCreate {
+			log.Info("create database")
+			tableManager = tbm.Create(*path)
+		} else if *isOpen {
+			log.Info("open database")
+			tableManager = tbm.Open(*path)
+		} else {
+			log.Error("create or open database")
+			return
+		}
 
-	p, _ = parser.NewParser(sql3)
-	stmt, _ = p.ParseStatement()
-	updateStmt := stmt.(ast.UpdateStmt)
-	result, err = tbm.Update(xid, updateStmt)
-	fmt.Println(result, err)
+		server := server.NewServer(tableManager)
+		// 启动服务器
+		go server.Start()
+		// 等待退出
+		WaitForExit()
+	} else if *isClient {
+		log.Info("run as client")
+		client := client.NewClient()
+		client.Start()
+	} else {
+		log.Error("run as server or client")
+		return
+	}
 
-	p, _ = parser.NewParser(sql2)
-	stmt, _ = p.ParseStatement()
-	selectStmt = stmt.(ast.SelectStmt)
-	result, err = tbm.Select(xid, selectStmt)
-	fmt.Println(result, err)
+}
 
-	tbm.Commit(xid)
+func WaitForExit() {
+	// 设置退出信号
+	exit := make(chan bool)
 
-	tbm.Close()
+	// 等待用户输入
+	go func() {
+		var input string
+		for {
+			_, err := fmt.Scanln(&input)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+
+			if input == "exit" {
+				exit <- true
+				return
+			}
+		}
+	}()
+
+	// 等待退出信号
+	<-exit
+	log.Info("exit")
 }

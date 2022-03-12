@@ -139,7 +139,7 @@ func (s *Serializer) Delete(xid tm.XID, deleteStmt ast.DeleteStatement) ([]*ast.
 	rows := make([]*ast.Row, 0)
 	for row := range row_chan {
 		row.SetXmax(xid)
-		s.dataManager.PageFile().WriteAt(row.Encode(), int64(row.Offset()))
+		s.dataManager.PageFile().WriteAt(row.Encode(), int64(row.Offset))
 		rows = append(rows, row)
 	}
 	return rows, nil

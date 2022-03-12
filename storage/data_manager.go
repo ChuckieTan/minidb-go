@@ -133,11 +133,11 @@ func whereToFunc(tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) (
 		switch expr.Op {
 		case token.TT_EQUAL:
 			return func(row *ast.Row) bool {
-				return row.Data()[indexL] == row.Data()[indexR]
+				return row.Data[indexL] == row.Data[indexR]
 			}, nil
 		case token.TT_NOT_EQUAL:
 			return func(row *ast.Row) bool {
-				return row.Data()[indexL] != row.Data()[indexR]
+				return row.Data[indexL] != row.Data[indexR]
 			}, nil
 		// TODO: 大于小于比较
 		default:
@@ -157,11 +157,11 @@ func whereToFunc(tableInfo *pagedata.TableInfo, expr *ast.SQLExpr) (
 		switch expr.Op {
 		case token.TT_EQUAL:
 			return func(row *ast.Row) bool {
-				return row.Data()[columnIndex] == expr.Right
+				return row.Data[columnIndex] == expr.Right
 			}, nil
 		case token.TT_NOT_EQUAL:
 			return func(row *ast.Row) bool {
-				return row.Data()[columnIndex] != expr.Right
+				return row.Data[columnIndex] != expr.Right
 			}, nil
 		default:
 			return nil, fmt.Errorf("operator %v not support", expr.Op)
@@ -237,10 +237,10 @@ func (dm *DataManager) equalSearch(rows chan<- *ast.Row, tableInfo *pagedata.Tab
 
 func checkValueFunc(value ast.SQLExprValue) func(*ast.Row) bool {
 	return func(row *ast.Row) bool {
-		if len(row.Data()) == 0 {
+		if len(row.Data) == 0 {
 			return false
 		}
-		return ast.SQLValueEqual(row.Data()[0], value)
+		return ast.SQLValueEqual(row.Data[0], value)
 	}
 }
 
@@ -331,7 +331,7 @@ func (dm *DataManager) InsertData(insertStatement ast.InsertIntoStmt) {
 	}
 	row := ast.NewRow(insertStatement.Row)
 	// TODO: 检查字段是否存在
-	dataPage, err := dm.pager.Select(row.Size(), insertStatement.TableName)
+	dataPage, err := dm.pager.Select(row.Size, insertStatement.TableName)
 	row.SetOffset(uint64(dataPage.Size()))
 	if err != nil {
 		log.Errorf("table %s not exist", insertStatement.TableName)

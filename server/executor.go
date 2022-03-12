@@ -13,18 +13,18 @@ func ExecuteStmt(tbm *tbm.TableManager, request *transporter.Request) *transport
 	response := &transporter.Response{}
 	stmt, err := parser.Parse(request.Stmt)
 	if err != nil {
-		response.Err = err
+		response.Err = err.Error()
 		return response
 	}
 	switch stmt := stmt.(type) {
 	case ast.CreateTableStmt:
-		response.Err = tbm.CreateTable(xid, stmt)
+		err = tbm.CreateTable(xid, stmt)
 	case ast.InsertIntoStmt:
 		if xid == 0 {
 			// 开启一个临时事务
 			xid = tbm.Begin()
 		}
-		response.ResultList, response.Err = tbm.Insert(xid, stmt)
+		response.ResultList, err = tbm.Insert(xid, stmt)
 		if xid != response.Xid {
 			// 结束临时事务
 			tbm.Commit(xid)
@@ -34,7 +34,7 @@ func ExecuteStmt(tbm *tbm.TableManager, request *transporter.Request) *transport
 			// 开启一个临时事务
 			xid = tbm.Begin()
 		}
-		response.ResultList, response.Err = tbm.Delete(xid, stmt)
+		response.ResultList, err = tbm.Delete(xid, stmt)
 		if xid != response.Xid {
 			// 结束临时事务
 			tbm.Commit(xid)
@@ -44,7 +44,7 @@ func ExecuteStmt(tbm *tbm.TableManager, request *transporter.Request) *transport
 			// 开启一个临时事务
 			xid = tbm.Begin()
 		}
-		response.ResultList, response.Err = tbm.Update(xid, stmt)
+		response.ResultList, err = tbm.Update(xid, stmt)
 		if xid != response.Xid {
 			// 结束临时事务
 			tbm.Commit(xid)
@@ -54,7 +54,7 @@ func ExecuteStmt(tbm *tbm.TableManager, request *transporter.Request) *transport
 			// 开启一个临时事务
 			xid = tbm.Begin()
 		}
-		response.ResultList, response.Err = tbm.Select(xid, stmt)
+		response.ResultList, err = tbm.Select(xid, stmt)
 		if xid != response.Xid {
 			// 结束临时事务
 			tbm.Commit(xid)
@@ -62,11 +62,14 @@ func ExecuteStmt(tbm *tbm.TableManager, request *transporter.Request) *transport
 	case ast.BeginStmt:
 		response.Xid = tbm.Begin()
 	case ast.CommitStmt:
-		response.Err = tbm.Commit(xid)
+		err = tbm.Commit(xid)
 	case ast.RollbackStmt:
-		response.Err = tbm.Abort(xid)
+		err = tbm.Abort(xid)
 	default:
-		response.Err = errors.New("unsupported statement")
+		err = errors.New("unsupported statement")
+	}
+	if err != nil {
+		response.Err = err.Error()
 	}
 	return response
 }
