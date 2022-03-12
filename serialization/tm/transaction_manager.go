@@ -48,7 +48,7 @@ func Create(path string) *TransactionManager {
 	}
 	tm := &TransactionManager{
 		file:       file,
-		xidCounter: 1,
+		xidCounter: 0,
 	}
 	return tm
 }

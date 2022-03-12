@@ -24,20 +24,28 @@ func NewParser(sql string) (*Parser, error) {
 	return parser, nil
 }
 
+func Parse(sql string) (ast.SQLStatement, error) {
+	parser, err := NewParser(sql)
+	if err != nil {
+		return nil, err
+	}
+	return parser.ParseStatement()
+}
+
 func (parser *Parser) ParseStatement() (ast.SQLStatement, error) {
 	savePoint := parser.lexer.mark()
 	if parser.chain(token.TT_BEGIN, token.TT_SEMICOLON) {
-		return ast.SQLBeginTransaction{}, nil
+		return ast.BeginStmt{}, nil
 	}
 
 	parser.lexer.reset(savePoint)
 	if parser.chain(token.TT_COMMIT, token.TT_SEMICOLON) {
-		return ast.SQLCommitTransaction{}, nil
+		return ast.CommitStmt{}, nil
 	}
 
 	parser.lexer.reset(savePoint)
 	if parser.chain(token.TT_ROLLBACK, token.TT_SEMICOLON) {
-		return ast.SQLRollbackTransaction{}, nil
+		return ast.RollbackStmt{}, nil
 	}
 
 	parser.lexer.reset(savePoint)

@@ -6,15 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"minidb-go/tm"
+	"minidb-go/serialization/tm"
 )
 
 type Row struct {
 	size   uint16
 	offset uint64
 
-	columns []string
-	data    []SQLExprValue
+	data []SQLExprValue
 }
 
 func NewRow(data []SQLExprValue) *Row {

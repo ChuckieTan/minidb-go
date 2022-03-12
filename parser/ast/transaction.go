@@ -4,23 +4,23 @@ type Transaction struct {
 	statements []SQLStatement
 }
 
-type SQLBeginTransaction struct {
+type BeginStmt struct {
 }
 
-func (stmt SQLBeginTransaction) StatementType() string {
+func (stmt BeginStmt) StatementType() string {
 	return "begin"
 }
 
-type SQLCommitTransaction struct {
+type CommitStmt struct {
 }
 
-func (stmt SQLCommitTransaction) StatementType() string {
+func (stmt CommitStmt) StatementType() string {
 	return "commit"
 }
 
-type SQLRollbackTransaction struct {
+type RollbackStmt struct {
 }
 
-func (stmt SQLRollbackTransaction) StatementType() string {
+func (stmt RollbackStmt) StatementType() string {
 	return "rollback"
 }
