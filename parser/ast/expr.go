@@ -24,26 +24,12 @@ type SQLText string
 type SQLColumn string
 
 type SQLExprValue interface {
-	isExpr() bool
 	ValueType() SQLValueType
 	Raw() []byte
 	Encode(w io.Writer)
 	Decode(r io.Reader)
 	String() string
 	DeepCopy() SQLExprValue
-}
-
-func (sqlInt *SQLInt) isExpr() bool {
-	return true
-}
-func (sqlFloat *SQLFloat) isExpr() bool {
-	return true
-}
-func (sqlText *SQLText) isExpr() bool {
-	return true
-}
-func (sqlColumn *SQLColumn) isExpr() bool {
-	return true
 }
 
 func (sqlInt *SQLInt) ValueType() SQLValueType {

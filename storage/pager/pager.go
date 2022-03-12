@@ -33,7 +33,6 @@ func Create(path string) *Pager {
 
 	pager.cache = lru.NewLRU(util.PAGE_CACHE_CAP)
 
-	log.Info("create meta page")
 	// 初始化 meta page
 	metaData := pagedata.NewMetaData()
 	metaPage := pager.NewPage(metaData)
