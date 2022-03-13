@@ -59,12 +59,12 @@ func (node *BPlusTreeNode) LowerBound(key index.KeyType) uint16 {
 }
 
 func (node *BPlusTreeNode) needSplit() bool {
-	return node.Len > node.tree.order-1
+	return node.Len >= node.tree.order-1
 }
 
 // 可以插入重复的 Key
 // TODO: 如果 Key 和 Value 都存在， 则不插入
-func (node *BPlusTreeNode) insertEntry(key index.KeyType, value index.ValueType) (ok bool) {
+func (node *BPlusTreeNode) insertEntry(key index.KeyType, value index.ValueType) bool {
 	redolog := redolog.NewBNodeInsertKVLog(
 		node.tree.tableId, node.tree.columnId, node.Addr, key, value)
 	node.page.AppendLog(redolog)
@@ -84,7 +84,7 @@ func (node *BPlusTreeNode) insertEntry(key index.KeyType, value index.ValueType)
 		node.Values[index+1] = value
 	}
 	node.Len++
-	return
+	return true
 }
 
 func (node *BPlusTreeNode) Size() int {
@@ -137,6 +137,7 @@ func (node *BPlusTreeNode) Unlock() {
 
 func (node *BPlusTreeNode) Encode() []byte {
 	buff := new(bytes.Buffer)
+	buff.Grow(node.Size())
 	binary.Write(buff, binary.BigEndian, node.Addr)
 	binary.Write(buff, binary.BigEndian, node.Parent)
 	binary.Write(buff, binary.BigEndian, node.PreLeaf)

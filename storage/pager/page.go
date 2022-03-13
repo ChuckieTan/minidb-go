@@ -70,12 +70,14 @@ func (p *Page) PageNum() util.UUID {
 // 返回 Page 数据的二进制，PageSize的大小
 func (page *Page) Raw() []byte {
 	buff := new(bytes.Buffer)
+	buff.Grow(util.PAGE_SIZE)
 	binary.Write(buff, binary.BigEndian, page.pageNum)
 	binary.Write(buff, binary.BigEndian, page.LSN)
 	binary.Write(buff, binary.BigEndian, page.nextPageNum)
 	binary.Write(buff, binary.BigEndian, page.prevPageNum)
 	dataByte := page.data.Encode()
 	buff.Write(dataByte)
+	// logrus.Info(len(buff.Bytes()))
 	zeroLen := util.PAGE_SIZE - buff.Len()
 	buff.Write(make([]byte, zeroLen))
 	return buff.Bytes()

@@ -57,6 +57,7 @@ func (redo *Redo) Append(logs []redolog.Log) (int64, error) {
 	redo.lock.Lock()
 	defer redo.lock.Unlock()
 	buf := new(bytes.Buffer)
+	buf.Grow(512)
 	for _, log := range logs {
 		err := redo.write(log, buf)
 		if err != nil {

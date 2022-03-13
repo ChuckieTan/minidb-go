@@ -22,6 +22,7 @@ func NewRecordData() *RecordData {
 
 func (r *RecordData) Encode() []byte {
 	buf := new(bytes.Buffer)
+	buf.Grow(int(r.size))
 	binary.Write(buf, binary.BigEndian, r.size)
 	binary.Write(buf, binary.BigEndian, uint8(len(r.rows)))
 	for _, row := range r.rows {
@@ -57,9 +58,9 @@ func (record *RecordData) Size() int {
 	return int(record.size)
 }
 
-func (record *RecordData) Append(rows *ast.Row) {
-	record.rows = append(record.rows, rows)
-	record.size += rows.Size
+func (record *RecordData) Append(row *ast.Row) {
+	record.rows = append(record.rows, row)
+	record.size += row.Size
 }
 
 func (record *RecordData) PageDataType() PageDataType {

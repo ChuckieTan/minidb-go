@@ -32,38 +32,6 @@ func init() {
 	gob.Register(ast.SQLColumn(""))
 }
 
-// func main() {
-// 	// 创建数据库
-// 	db := tbm.Create("test.db")
-// 	// 创建表
-// 	table := db.CreateTable("user")
-// 	// 创建索引
-// 	index := table.CreateIndex("idx_name", "name")
-// 	// 创建索引
-// 	index = table.CreateIndex("idx_age", "age")
-// 	// 创建索引
-// 	index = table.CreateIndex("idx_score", "score")
-// 	// 创建索引
-// 	index = table.CreateIndex("idx_score_age", "score", "age")
-// 	// 创建索引
-// 	index = table.CreateIndex("idx_score_age_name", "score", "age", "name")
-
-// 	// 插入数据
-// 	table.Insert(1, "张三", 18, 100.0)
-// 	table.Insert(2, "李四", 19, 99.0)
-// 	table.Insert(3, "王五", 20, 98.0)
-// 	table.Insert(4, "赵六", 21, 97.0)
-// 	table.Insert(5, "钱七", 22, 96.0)
-// 	table.Insert(6, "孙八", 23, 95.0)
-// 	table.Insert(7, "周九", 24, 94.0)
-// 	table.Insert(8, "吴十", 25, 93.0)
-// 	table.Insert(9, "郑十一", 26, 92.0)
-// 	table.Insert(10, "王十二", 27, 91.0)
-// 	table.Insert(11, "李十三", 28, 90.0)
-// 	table.Insert(12, "张十四", 29, 89.0)
-// 	table.Insert(13, "李十五", 30, 88.0)
-// }
-
 func main() {
 	isServer := flag.Bool("server", false, "run as server")
 	isClient := flag.Bool("client", false, "run as client")
@@ -83,6 +51,11 @@ func main() {
 
 		log.Info("run as server")
 		var tableManager *tbm.TableManager
+		defer func() {
+			if tableManager != nil {
+				tableManager.Close()
+			}
+		}()
 		if *isCreate {
 			log.Info("create database")
 			tableManager = tbm.Create(*path)

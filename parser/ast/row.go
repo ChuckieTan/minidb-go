@@ -46,6 +46,7 @@ func (row *Row) String() string {
 
 func (row *Row) Encode() []byte {
 	buf := new(bytes.Buffer)
+	buf.Grow(int(row.Size))
 	binary.Write(buf, binary.BigEndian, row.Size)
 	binary.Write(buf, binary.BigEndian, row.Offset)
 	binary.Write(buf, binary.BigEndian, uint8(len(row.Data)))

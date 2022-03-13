@@ -66,9 +66,9 @@ func (r *Recovery) recover() {
 }
 
 func (rec *Recovery) Write(page *pager.Page) {
-	LSN, _ := rec.redo.Append(page.Logs())
-	// 需要先更新页的 LSN，再写入 double write
-	page.LSN = LSN
+	// LSN, _ := rec.redo.Append(page.Logs())
+	// // 需要先更新页的 LSN，再写入 double write
+	// page.LSN = LSN
 	rec.dwrite.Write(page)
 }
 

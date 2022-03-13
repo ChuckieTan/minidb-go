@@ -77,9 +77,10 @@ func NewMetaData() *MetaData {
 
 func (m *MetaData) Encode() []byte {
 	buf := new(bytes.Buffer)
+	buf.Grow(util.PAGE_SIZE / 2)
 	err := gob.NewEncoder(buf).Encode(m)
 	if err != nil {
-		log.Error("meta data encode failed: ", err)
+		log.Error(err)
 		return nil
 	}
 	return buf.Bytes()

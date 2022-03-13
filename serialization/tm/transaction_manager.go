@@ -42,6 +42,8 @@ type TransactionManager struct {
 func Create(path string) *TransactionManager {
 	path = path + "/" + XID_FILE_NAME
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
+	file.WriteAt(xidToBytes(0), 0)
+	file.Sync()
 	if err != nil {
 		log.Fatal(err)
 		return nil

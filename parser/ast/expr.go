@@ -50,6 +50,7 @@ func (sqlInt *SQLInt) Raw() []byte {
 	binary.BigEndian.PutUint64(raw, uint64(*sqlInt))
 	return raw
 }
+
 func (sqlInt *SQLInt) Encode(w io.Writer) {
 	binary.Write(w, binary.BigEndian, SQL_INT)
 	binary.Write(w, binary.BigEndian, sqlInt)

@@ -332,7 +332,7 @@ func (dm *DataManager) InsertData(insertStatement ast.InsertIntoStmt) {
 	row := ast.NewRow(insertStatement.Row)
 	// TODO: 检查字段是否存在
 	dataPage, err := dm.pager.Select(row.Size, insertStatement.TableName)
-	row.SetOffset(uint64(dataPage.Size()))
+	row.SetOffset(uint64(dataPage.PageNum())*util.PAGE_SIZE + uint64(dataPage.Size()))
 	if err != nil {
 		log.Errorf("table %s not exist", insertStatement.TableName)
 		return

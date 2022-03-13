@@ -10,7 +10,7 @@ import (
 )
 
 type Parser struct {
-	lexer Lexer
+	lexer *Lexer
 }
 
 func NewParser(sql string) (*Parser, error) {

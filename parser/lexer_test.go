@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func BenchmarkParser(b *testing.B) {
+func BenchmarkLexer(b *testing.B) {
 	sqls := []string{
 		"create table student (id int, name text);",
 		"select * from student where id = 1;",
@@ -14,6 +14,6 @@ func BenchmarkParser(b *testing.B) {
 		"delete from student where id = 1;",
 	}
 	for i := 0; i < b.N; i++ {
-		parser.Parse(sqls[i%5])
+		parser.NewLexer(sqls[i%5])
 	}
 }

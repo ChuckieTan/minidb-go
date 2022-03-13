@@ -18,3 +18,5 @@ input.txt
 minidb-go
 
 .vscode
+
+*.pprof

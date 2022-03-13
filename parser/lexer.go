@@ -27,11 +27,15 @@ func (lexer *Lexer) reset(savePoint savePoint) {
 	lexer.tokenPos = savePoint.tokenPos
 }
 
-func NewLexer(_sql string) (lexer Lexer, err error) {
-	lexer = Lexer{sql: _sql, tokenPos: 0, tokenSequence: make([]token.Token, 0)}
+func NewLexer(_sql string) (lexer *Lexer, err error) {
+	lexer = &Lexer{
+		sql:           strings.ToLower(_sql),
+		tokenPos:      0,
+		tokenSequence: make([]token.Token, 0, 16),
+	}
 	pos := 0
 	for {
-		resToken, chNum, err := scanToken(lexer.sql, pos)
+		resToken, chNum, err := lexer.scanToken(pos)
 		if resToken.Type == token.TT_END || resToken.Type == token.TT_ILLEGAL {
 			break
 		}
@@ -83,15 +87,15 @@ var symbolTokenType = map[string]token.TokenType{
 	"%":  token.TT_MOD,
 }
 
-func scanSymbolToken(sql string, pos int) (token.Token, error) {
-	if pos < len(sql)-1 {
-		ch := sql[pos : pos+2]
+func (lexer *Lexer) scanSymbolToken(pos int) (token.Token, error) {
+	if pos < len(lexer.sql)-1 {
+		ch := lexer.sql[pos : pos+2]
 		if tokenType, ok := symbolTokenType[ch]; ok {
 			return token.Token{Type: tokenType, Val: ch}, nil
 		}
 	}
 
-	ch := sql[pos : pos+1]
+	ch := lexer.sql[pos : pos+1]
 	if tokenType, ok := symbolTokenType[ch]; ok {
 		return token.Token{Type: tokenType, Val: ch}, nil
 	}
@@ -132,16 +136,15 @@ var keywordTokenType = map[string]token.TokenType{
 	"rollback": token.TT_ROLLBACK,
 }
 
-func scanLiteralToken(sql string, pos int) (resToken token.Token, err error) {
+func (lexer *Lexer) scanLiteralToken(pos int) (resToken token.Token, err error) {
 	tokenLen := 1
-	ch := rune(sql[pos+tokenLen])
-	for pos+tokenLen < len(sql) &&
+	ch := rune(lexer.sql[pos+tokenLen])
+	for pos+tokenLen < len(lexer.sql) &&
 		(unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_') {
 		tokenLen++
-		ch = rune(sql[pos+tokenLen])
+		ch = rune(lexer.sql[pos+tokenLen])
 	}
-	word := sql[pos : pos+tokenLen]
-	word = strings.ToLower(word)
+	word := lexer.sql[pos : pos+tokenLen]
 
 	if tokenType, ok := keywordTokenType[word]; ok {
 		resToken = token.Token{Type: tokenType, Val: word}
@@ -152,19 +155,19 @@ func scanLiteralToken(sql string, pos int) (resToken token.Token, err error) {
 	return resToken, nil
 }
 
-func scanNumberToken(sql string, pos int) (resToken token.Token, err error) {
+func (lexer *Lexer) scanNumberToken(pos int) (resToken token.Token, err error) {
 	tokenLen, numOfDot := 0, 0
 
-	ch := rune(sql[pos+tokenLen])
-	for pos+tokenLen < len(sql) &&
+	ch := rune(lexer.sql[pos+tokenLen])
+	for pos+tokenLen < len(lexer.sql) &&
 		(unicode.IsDigit(ch) || ch == '.') {
 		if ch == '.' {
 			numOfDot++
 		}
 		tokenLen++
-		ch = rune(sql[pos+tokenLen])
+		ch = rune(lexer.sql[pos+tokenLen])
 	}
-	word := sql[pos : pos+tokenLen]
+	word := lexer.sql[pos : pos+tokenLen]
 
 	switch numOfDot {
 	case 0:
@@ -181,42 +184,39 @@ func scanNumberToken(sql string, pos int) (resToken token.Token, err error) {
 	return resToken, err
 }
 
-func scanStringToken(sql string, pos int) (
-	resToken token.Token,
-	err error,
-) {
-	if sql[pos] != '\'' {
+func (lexer *Lexer) scanStringToken(pos int) (resToken token.Token, err error) {
+	if lexer.sql[pos] != '\'' {
 		err = fmt.Errorf("not a string")
 		return
 	}
 	tokenLen := 1
-	for sql[pos+tokenLen] != '\'' {
+	for lexer.sql[pos+tokenLen] != '\'' {
 		tokenLen++
 	}
-	resToken = token.Token{Type: token.TT_STRING, Val: (sql)[pos+1 : pos+tokenLen]}
+	resToken = token.Token{Type: token.TT_STRING, Val: (lexer.sql)[pos+1 : pos+tokenLen]}
 	return resToken, nil
 }
 
-func scanToken(sql string, pos int) (resToken token.Token, chNum int, err error) {
-	if pos >= len(sql) {
+func (lexer *Lexer) scanToken(pos int) (resToken token.Token, chNum int, err error) {
+	if pos >= len(lexer.sql) {
 		return token.Token{Type: token.TT_END, Val: ""}, chNum, nil
 	}
 	// 忽略空白字符
-	for unicode.IsSpace(rune(sql[pos])) {
+	for unicode.IsSpace(rune(lexer.sql[pos])) {
 		pos++
 		chNum++
 	}
-	ch := rune(sql[pos])
+	ch := rune(lexer.sql[pos])
 	switch {
-	case unicode.IsDigit(ch):
-		resToken, err = scanNumberToken(sql, pos)
 	case unicode.IsLetter(ch):
-		resToken, err = scanLiteralToken(sql, pos)
+		resToken, err = lexer.scanLiteralToken(pos)
+	case unicode.IsDigit(ch):
+		resToken, err = lexer.scanNumberToken(pos)
 	case ch == '\'':
-		resToken, err = scanStringToken(sql, pos)
+		resToken, err = lexer.scanStringToken(pos)
 		chNum += 2
 	default:
-		resToken, err = scanSymbolToken(sql, pos)
+		resToken, err = lexer.scanSymbolToken(pos)
 	}
 	chNum += len(resToken.Val)
 	return resToken, chNum, err

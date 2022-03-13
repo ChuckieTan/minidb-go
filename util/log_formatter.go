@@ -33,7 +33,8 @@ func (m *MyFormatter) Format(entry *log.Entry) ([]byte, error) {
 	blue := color.New(color.FgBlue).SprintFunc()
 
 	toColor := color.New(levelColor).SprintFunc()
-	timestamp := entry.Time.Format("2006-01-02 15:04:05.000")
+	timestamp := entry.Time.Format("2006-01-02 15:04:05")
+	// timestamp := entry.Time.Format("2006-01-02 15:04:05.000")
 	var file string
 	var line int
 	if entry.Caller != nil {

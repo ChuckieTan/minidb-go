@@ -24,6 +24,7 @@ import (
 	"minidb-go/util"
 	"sync"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -284,25 +285,30 @@ func (tree *BPlusTree) Insert(key index.KeyType, value index.ValueType) error {
 		}
 	}
 	node, _ := tree.searchLowerInTree(key, Visit_Write)
-	defer unlockNode(node, Visit_Write)
 
 	// TODO: 新插入的 value 需要放在最后一个位置
 	ok := node.insertEntry(key, value)
+	// logrus.Infof("insert key: %v, value: %v, ok: %v", key, value, ok)
 	tree.rec.Write(node.page)
 
 	if !ok {
 		err := fmt.Errorf("insert key-value pair failed: key: %v, value: %v", key, value)
+		logrus.Error(err)
 		return err
 	}
+
 	if node.needSplit() {
+		// node 在 split 函数里面被 unlock
 		tree.splitLeaf(node)
+	} else {
+		unlockNode(node, Visit_Write)
 	}
 	return nil
 }
 
 func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
-	lockNode(node, Visit_Write)
+	logrus.Infof("split leaf node: %v", node.Addr)
 	defer unlockNode(node, Visit_Write)
 
 	if node.Addr == tree.Root {
@@ -375,6 +381,7 @@ func (tree *BPlusTree) splitLeaf(node *BPlusTreeNode) {
 }
 
 func (tree *BPlusTree) splitParent(node *BPlusTreeNode) {
+	logrus.Infof("split parent node: %v", node.Addr)
 	lockNode(node, Visit_Write)
 	defer unlockNode(node, Visit_Write)
 	// 如果当前节点是根节点，那需要新建一个根节点作为分裂后节点的父节点
