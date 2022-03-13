@@ -26,10 +26,14 @@ func init() {
 
 	// 注册 gob 接口类型
 	gob.Register(bplustree.BPlusTree{})
-	gob.Register(ast.SQLInt(0))
-	gob.Register(ast.SQLFloat(0))
-	gob.Register(ast.SQLText(""))
-	gob.Register(ast.SQLColumn(""))
+	sqlInt := ast.SQLInt(0)
+	sqlFloat := ast.SQLFloat(0)
+	sqlText := ast.SQLText("")
+	sqlColumn := ast.SQLColumn("")
+	gob.RegisterName("minidb-go/parser/ast.SQLInt", &sqlInt)
+	gob.RegisterName("minidb-go/parser/ast.SQLFloat", &sqlFloat)
+	gob.RegisterName("minidb-go/parser/ast.SQLText", &sqlText)
+	gob.RegisterName("minidb-go/parser/ast.SQLColumn", &sqlColumn)
 }
 
 func main() {

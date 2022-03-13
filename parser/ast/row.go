@@ -11,7 +11,7 @@ import (
 
 type Row struct {
 	Size   uint16
-	Offset uint64
+	Offset int64
 
 	Data []SQLExprValue
 }
@@ -24,7 +24,7 @@ func NewRow(data []SQLExprValue) *Row {
 	return row
 }
 
-func (row *Row) SetOffset(offset uint64) {
+func (row *Row) SetOffset(offset int64) {
 	row.Offset = offset
 }
 

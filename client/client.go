@@ -58,7 +58,6 @@ func (client *Client) Start() {
 			continue
 		}
 		if line[len(line)-1] == ';' {
-			fmt.Print("minidb> ")
 			stmt = line
 		} else {
 			fmt.Print("    >>> ")
@@ -66,7 +65,6 @@ func (client *Client) Start() {
 			continue
 		}
 
-		log.Info(stmt)
 		// 发送数据
 		request := &transporter.Request{
 			Xid:  xid,
@@ -83,14 +81,16 @@ func (client *Client) Start() {
 		err = dec.Decode(response)
 		if err != nil {
 			log.Error(err)
-			return
 		}
 		if response.Err != "" {
 			fmt.Println(response.Err)
 			fmt.Print("minidb> ")
 			continue
 		}
-		fmt.Println(response.ResultList)
+		xid = response.Xid
+		if response.ResultList != nil {
+			fmt.Println(response.ResultList)
+		}
 		fmt.Print("minidb> ")
 	}
 }

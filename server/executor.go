@@ -10,7 +10,9 @@ import (
 
 func ExecuteStmt(tbm *tbm.TableManager, request *transporter.Request) *transporter.Response {
 	xid := request.Xid
-	response := &transporter.Response{}
+	response := &transporter.Response{
+		Xid: xid,
+	}
 	stmt, err := parser.Parse(request.Stmt)
 	if err != nil {
 		response.Err = err.Error()
@@ -25,7 +27,7 @@ func ExecuteStmt(tbm *tbm.TableManager, request *transporter.Request) *transport
 			xid = tbm.Begin()
 		}
 		response.ResultList, err = tbm.Insert(xid, stmt)
-		if xid != response.Xid {
+		if xid != request.Xid {
 			// 结束临时事务
 			tbm.Commit(xid)
 		}
@@ -35,7 +37,7 @@ func ExecuteStmt(tbm *tbm.TableManager, request *transporter.Request) *transport
 			xid = tbm.Begin()
 		}
 		response.ResultList, err = tbm.Delete(xid, stmt)
-		if xid != response.Xid {
+		if xid != request.Xid {
 			// 结束临时事务
 			tbm.Commit(xid)
 		}
@@ -45,7 +47,7 @@ func ExecuteStmt(tbm *tbm.TableManager, request *transporter.Request) *transport
 			xid = tbm.Begin()
 		}
 		response.ResultList, err = tbm.Update(xid, stmt)
-		if xid != response.Xid {
+		if xid != request.Xid {
 			// 结束临时事务
 			tbm.Commit(xid)
 		}
@@ -55,7 +57,7 @@ func ExecuteStmt(tbm *tbm.TableManager, request *transporter.Request) *transport
 			xid = tbm.Begin()
 		}
 		response.ResultList, err = tbm.Select(xid, stmt)
-		if xid != response.Xid {
+		if xid != request.Xid {
 			// 结束临时事务
 			tbm.Commit(xid)
 		}
@@ -63,8 +65,10 @@ func ExecuteStmt(tbm *tbm.TableManager, request *transporter.Request) *transport
 		response.Xid = tbm.Begin()
 	case ast.CommitStmt:
 		err = tbm.Commit(xid)
+		response.Xid = 0
 	case ast.RollbackStmt:
 		err = tbm.Abort(xid)
+		response.Xid = 0
 	default:
 		err = errors.New("unsupported statement")
 	}

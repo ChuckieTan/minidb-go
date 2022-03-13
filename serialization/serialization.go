@@ -3,22 +3,28 @@ package serialization
 import (
 	"errors"
 	"minidb-go/parser/ast"
+	"minidb-go/serialization/tablelock"
 	"minidb-go/serialization/tm"
 	"minidb-go/storage"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 )
 
 var (
-	ErrXidNotExists = errors.New("Transaction not exists")
+	ErrXidNotExists = errors.New("transaction not exists")
+	ErrDeadLock     = errors.New("deadlock detected, abort transaction")
 )
 
-// 使所有事务之间满足可重复读隔离，使用 MVCC 实现
+// 使所有事务之间满足可重复读，使用 MVCC 实现
 type Serializer struct {
 	transactionManager *tm.TransactionManager
 	dataManager        *storage.DataManager
 
 	activeTransaction map[tm.XID]*Transaction
-	lock              sync.RWMutex
+
+	tableLock *tablelock.TableLock
+	lock      sync.RWMutex
 }
 
 func Open(path string, dataManager *storage.DataManager) *Serializer {
@@ -27,6 +33,7 @@ func Open(path string, dataManager *storage.DataManager) *Serializer {
 		transactionManager: transactionManager,
 		dataManager:        dataManager,
 		activeTransaction:  make(map[tm.XID]*Transaction),
+		tableLock:          tablelock.New(),
 	}
 	return serializer
 }
@@ -37,6 +44,7 @@ func Create(path string, dataManager *storage.DataManager) *Serializer {
 		transactionManager: transactionManager,
 		dataManager:        dataManager,
 		activeTransaction:  make(map[tm.XID]*Transaction),
+		tableLock:          tablelock.New(),
 	}
 	return serializer
 }
@@ -53,11 +61,15 @@ func (s *Serializer) Begin() tm.XID {
 func (s *Serializer) Commit(xid tm.XID) error {
 	s.lock.Lock()
 	if _, ok := s.activeTransaction[xid]; !ok {
+		logrus.Info(xid, s.activeTransaction)
+		s.lock.Unlock()
 		return ErrXidNotExists
 	}
 	delete(s.activeTransaction, xid)
 	s.lock.Unlock()
 
+	// 释放 xid 依赖的数据项
+	s.tableLock.Remove(xid)
 	s.transactionManager.Commit(xid)
 	return nil
 }
@@ -71,6 +83,9 @@ func (s *Serializer) Abort(xid tm.XID) error {
 	}
 	// 从 activeTransaction 中删除
 	delete(s.activeTransaction, xid)
+
+	// 释放 xid 对应的数据项
+	s.tableLock.Remove(xid)
 	s.transactionManager.Abort(xid)
 	return nil
 }
@@ -138,6 +153,14 @@ func (s *Serializer) Delete(xid tm.XID, deleteStmt ast.DeleteStatement) ([]*ast.
 	}
 	rows := make([]*ast.Row, 0)
 	for row := range row_chan {
+		ok, ch := s.tableLock.Add(xid, int64(row.Offset))
+		if !ok {
+			return nil, ErrDeadLock
+		}
+		// 等待数据行的锁释放
+		if ch != nil {
+			<-ch
+		}
 		row.SetXmax(xid)
 		s.dataManager.PageFile().WriteAt(row.Encode(), int64(row.Offset))
 		rows = append(rows, row)

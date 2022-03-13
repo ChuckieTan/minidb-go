@@ -93,7 +93,10 @@ func BenchmarkSelect(b *testing.B) {
 		stmtStr := fmt.Sprintf("select * from t1 where id = %v;", i)
 		stmt, _ := parser.Parse(stmtStr)
 		selectStmt := stmt.(ast.SelectStmt)
-		tbm.Select(xid, selectStmt)
+		_, err := tbm.Select(xid, selectStmt)
+		if err != nil {
+			logrus.Error(err)
+		}
 	}
 	destorytemp(path)
 }
