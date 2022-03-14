@@ -89,7 +89,7 @@ func (client *Client) Start() {
 		}
 		xid = response.Xid
 		if response.ResultList != nil {
-			fmt.Println(response.ResultList)
+			fmt.Print(response.ResultList)
 		}
 		fmt.Print("minidb> ")
 	}
