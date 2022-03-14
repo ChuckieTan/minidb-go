@@ -27,10 +27,10 @@ func NewServer(isOpen, isCreate bool, path string) *Server {
 		return nil
 	}
 	if isCreate {
-		log.Info("create database")
+		log.Infof("create database: %v", path)
 		server.tbm = tbm.Create(path)
 	} else if isOpen {
-		log.Info("open database")
+		log.Infof("open database: %v", path)
 		server.tbm = tbm.Open(path)
 	} else {
 		logrus.Fatal("create or open database")

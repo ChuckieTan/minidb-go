@@ -155,6 +155,7 @@ func (s *Serializer) Delete(xid tm.XID, deleteStmt ast.DeleteStatement) ([]*ast.
 	for row := range row_chan {
 		ok, ch := s.tableLock.Add(xid, int64(row.Offset))
 		if !ok {
+			s.Abort(xid)
 			return nil, ErrDeadLock
 		}
 		// 等待数据行的锁释放
