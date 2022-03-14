@@ -3,12 +3,10 @@ package main
 import (
 	"encoding/gob"
 	"flag"
-	"fmt"
 	"minidb-go/client"
 	"minidb-go/parser/ast"
 	"minidb-go/server"
 	"minidb-go/storage/bplustree"
-	"minidb-go/tbm"
 	"minidb-go/util"
 	"os"
 
@@ -44,71 +42,19 @@ func main() {
 	path := flag.String("path", "", "database path")
 	flag.Parse()
 
-	if *isServer == *isClient {
+	if *isServer && *isClient {
 		log.Fatal("server and client can't be both true")
 	}
 
 	if *isServer {
-		if *isCreate == *isOpen {
-			log.Fatal("create and open can't be both true")
-		}
-
 		log.Info("run as server")
-		var tableManager *tbm.TableManager
-		defer func() {
-			if tableManager != nil {
-				tableManager.Close()
-			}
-		}()
-		if *isCreate {
-			log.Info("create database")
-			tableManager = tbm.Create(*path)
-		} else if *isOpen {
-			log.Info("open database")
-			tableManager = tbm.Open(*path)
-		} else {
-			log.Error("create or open database")
-			return
-		}
-
-		server := server.NewServer(tableManager)
-		// 启动服务器
-		go server.Start()
-		// 等待退出
-		WaitForExit()
+		server := server.NewServer(*isOpen, *isCreate, *path)
+		server.Start()
 	} else if *isClient {
 		log.Info("run as client")
 		client := client.NewClient()
 		client.Start()
 	} else {
-		log.Error("run as server or client")
-		return
+		log.Fatal("run as server or client")
 	}
-
-}
-
-func WaitForExit() {
-	// 设置退出信号
-	exit := make(chan bool)
-
-	// 等待用户输入
-	go func() {
-		var input string
-		for {
-			_, err := fmt.Scanln(&input)
-			if err != nil {
-				log.Error(err)
-				continue
-			}
-
-			if input == "exit" {
-				exit <- true
-				return
-			}
-		}
-	}()
-
-	// 等待退出信号
-	<-exit
-	log.Info("exit")
 }

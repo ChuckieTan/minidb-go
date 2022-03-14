@@ -2,10 +2,12 @@ package server
 
 import (
 	"encoding/gob"
+	"fmt"
 	"minidb-go/tbm"
 	"minidb-go/transporter"
 	"net"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,25 +20,46 @@ type Server struct {
 	tbm *tbm.TableManager
 }
 
-func NewServer(tbm *tbm.TableManager) *Server {
-	return &Server{
-		tbm: tbm,
+func NewServer(isOpen, isCreate bool, path string) *Server {
+	server := &Server{}
+	if isOpen && isCreate {
+		logrus.Fatal("create and open can't be both true")
+		return nil
 	}
+	if isCreate {
+		log.Info("create database")
+		server.tbm = tbm.Create(path)
+	} else if isOpen {
+		log.Info("open database")
+		server.tbm = tbm.Open(path)
+	} else {
+		logrus.Fatal("create or open database")
+	}
+	return server
 }
 
 func (server *Server) Start() {
-	listener, err := net.Listen(NETWORK, ADDRESS)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Infof("Server start at %v://%v", NETWORK, ADDRESS)
-	for {
-		conn, err := listener.Accept()
+	go func() {
+		listener, err := net.Listen(NETWORK, ADDRESS)
 		if err != nil {
 			log.Fatal(err)
 		}
-		go server.handle(conn)
-	}
+		defer func() {
+			listener.Close()
+			if server.tbm != nil {
+				server.tbm.Close()
+			}
+		}()
+		log.Infof("server start at %v://%v", NETWORK, ADDRESS)
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				log.Fatal(err)
+			}
+			go server.handle(conn)
+		}
+	}()
+	WaitForExit()
 }
 
 func (server *Server) handle(conn net.Conn) {
@@ -62,4 +85,30 @@ func (server *Server) handle(conn net.Conn) {
 			return
 		}
 	}
+}
+
+func WaitForExit() {
+	// 设置退出信号
+	exit := make(chan bool)
+
+	// 等待用户输入
+	go func() {
+		var input string
+		for {
+			_, err := fmt.Scanln(&input)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+
+			if input == "exit" {
+				exit <- true
+				return
+			}
+		}
+	}()
+
+	// 等待退出信号
+	<-exit
+	log.Info("exit")
 }
