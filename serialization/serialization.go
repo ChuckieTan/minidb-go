@@ -7,8 +7,6 @@ import (
 	"minidb-go/serialization/tm"
 	"minidb-go/storage"
 	"sync"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -61,7 +59,6 @@ func (s *Serializer) Begin() tm.XID {
 func (s *Serializer) Commit(xid tm.XID) error {
 	s.lock.Lock()
 	if _, ok := s.activeTransaction[xid]; !ok {
-		logrus.Info(xid, s.activeTransaction)
 		s.lock.Unlock()
 		return ErrXidNotExists
 	}
