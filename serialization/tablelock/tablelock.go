@@ -6,9 +6,9 @@ import (
 )
 
 type TableLock struct {
-	// 事务依赖的数据行集合
+	// 事务持有的数据行集合
 	XidToRow map[tm.XID]map[int64]bool
-	// 数据行依赖的事务
+	// 持有该数据行的事务
 	RowToXid map[int64]tm.XID
 	// 等待对应数据行的事务集合
 	RowWaitXid map[int64]map[tm.XID]bool
@@ -124,28 +124,34 @@ func (tl *TableLock) Remove(xid tm.XID) {
 	delete(tl.XidWaitChans, xid)
 }
 
+// 在函数里面数据行依赖的旧事务
 // 选择对应 row 的一个事务，并将其从等待图中移除
 func (tl *TableLock) selectNewXid(row int64) {
 	// 删除数据行依赖的旧事务
 	delete(tl.RowToXid, row)
 	for xid := range tl.RowWaitXid[row] {
-		delete(tl.XidWaitRow, xid)
 		if _, ok := tl.XidWaitRow[xid]; !ok {
+			// 删除 xid 对 row 的等待
+			delete(tl.RowWaitXid[row], xid)
 			// 如果这个事务已经被撤销，则选择下一个
 			continue
 		} else {
 			tl.RowToXid[row] = xid
+			tl.XidToRow[xid][row] = true
+			// 删除 xid 对应的等待 row
+			delete(tl.XidWaitRow, xid)
+			// 删除 xid 对 row 的等待
+			delete(tl.RowWaitXid[row], xid)
+
 			ch := tl.XidWaitChans[xid]
 			// 删除 xid 对应的等待 channel
 			delete(tl.XidWaitChans, xid)
-			// 删除 xid 对 row 的等待
-			delete(tl.RowWaitXid[row], xid)
 			ch <- true
 			break
 		}
 	}
 	// 删除占用的空间
-	if len(tl.XidWaitChans) == 0 {
+	if len(tl.RowWaitXid[row]) == 0 {
 		delete(tl.RowWaitXid, row)
 	}
 }

@@ -20,3 +20,5 @@ minidb-go
 .vscode
 
 *.pprof
+
+test.sql
