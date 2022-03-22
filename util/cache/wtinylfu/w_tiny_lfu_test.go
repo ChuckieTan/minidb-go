@@ -45,12 +45,13 @@ func (i H) Hash() uint64 {
 }
 
 func TestCountMinSketch(t *testing.T) {
-	c := wtinylfu.NewCountMinSketch(10000)
-	for i := H(0); i < 10000; i++ {
+	const COUNT = 100000
+	c := wtinylfu.NewCountMinSketch(COUNT)
+	for i := H(0); i < COUNT; i++ {
 		c.Add(i)
 	}
 	cnt := 0
-	for i := H(0); i < 10000; i++ {
+	for i := H(0); i < COUNT; i++ {
 		if c.Count(i) != 1 {
 			cnt++
 		}

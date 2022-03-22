@@ -68,7 +68,7 @@ type CountMinSketch struct {
 
 func NewCountMinSketch(maxEntries int) *CountMinSketch {
 	ln2 := float64(math.Log(2))
-	tableSize := int(-float64(maxEntries)*math.Log(0.01)/(ln2*ln2)) / 2
+	tableSize := int(-float64(maxEntries) * math.Log(0.03) / (ln2 * ln2) * 0.8)
 	return &CountMinSketch{
 		maxEntries:   maxEntries,
 		tableSize:    tableSize,
