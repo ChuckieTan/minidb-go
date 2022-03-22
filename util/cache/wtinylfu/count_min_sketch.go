@@ -2,14 +2,13 @@ package wtinylfu
 
 import (
 	"math"
+
+	"github.com/sirupsen/logrus"
 )
 
 type Hashable interface {
 	Hash() uint64
 }
-
-var SEED []uint64 = []uint64{
-	0xc3a5c85c97cb3127, 0xb492b66fbe98f273, 0x9ae16a3b2f90404f, 0xcbf29ce484222325}
 
 type Unit struct {
 	num uint8
@@ -47,9 +46,10 @@ func (u *Unit) AddLower() {
 
 // 将高位加一，大于 16 将忽略
 func (u *Unit) AddUpper() {
-	if u.GetUpper() < 16 {
-		u.num += 16
+	if u.GetUpper() >= 15 {
+		return
 	}
+	u.num += 16
 }
 
 type CountMinSketch struct {
@@ -60,6 +60,9 @@ type CountMinSketch struct {
 	// 数组
 	table []Unit
 
+	// 要进行哈希的次数
+	hashNum int
+
 	// 进行加 1 的总数
 	count int
 	// 最大总频率，超过这个频率应该把所有的数值全都除以 2
@@ -67,21 +70,35 @@ type CountMinSketch struct {
 }
 
 func NewCountMinSketch(maxEntries int) *CountMinSketch {
+	errorRate := 0.03
 	ln2 := float64(math.Log(2))
-	tableSize := int(-float64(maxEntries) * math.Log(0.01) / (ln2 * ln2) * 0.5)
+	hashNum := int(math.Round(-math.Log(errorRate) / ln2))
+	if hashNum == 0 {
+		hashNum = 1
+	}
+	// hashNum := 4
+	logrus.Error(hashNum)
+	tableSize := int(-float64(maxEntries) * math.Log(errorRate) / (ln2 * ln2) * 0.5)
 	return &CountMinSketch{
 		maxEntries:   maxEntries,
 		tableSize:    tableSize,
 		table:        make([]Unit, tableSize),
+		hashNum:      hashNum,
 		count:        0,
 		maxFrequency: maxEntries * 10,
 	}
 }
 
+var SEED []uint64 = []uint64{
+	0xc3a5c85c97cb3127, 0xb492b66fbe98f273, 0x9ae16a3b2f90404f, 0xcbf29ce484222325,
+	0xeecc86d2b849bd0d, 0xc3a5c85c97cb3127, 0xb492b66fbe98f273, 0x9ae16a3b2f90404f,
+	0xcbf29ce484222325, 0xeecc86d2b849bd0d, 0xc3a5c85c97cb3127, 0xb492b66fbe98f273,
+}
+
 // 根据传入的元素计算出 4 个 hash 值，处于 [0, tableSize * 2)
 func (c *CountMinSketch) getHashs(e Hashable) []uint64 {
 	var index []uint64
-	for i := 0; i < 4; i++ {
+	for i := 0; i < c.hashNum; i++ {
 		index = append(index, e.Hash()*SEED[i]%(uint64(c.tableSize)*2))
 	}
 	return index

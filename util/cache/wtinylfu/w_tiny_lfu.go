@@ -45,6 +45,10 @@ type WTinyLFU[K KeyType, V any] struct {
 	lock sync.Mutex
 }
 
+var (
+	ErrorRate = 0.03
+)
+
 // NewWTinyLFU[K KeyType, V any] 初始化一个新的 WTinyLFU[K KeyType, V any]
 // maxEntries: 最大容量，需要大于 100
 // onEvicted: 当被淘汰的时候调用的函数
