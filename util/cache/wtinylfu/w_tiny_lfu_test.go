@@ -45,7 +45,7 @@ func (i H) Hash() uint64 {
 }
 
 func TestCountMinSketch(t *testing.T) {
-	const COUNT = 100000
+	const COUNT = 1000000
 	c := wtinylfu.NewCountMinSketch(COUNT)
 	for i := H(0); i < COUNT; i++ {
 		c.Add(i)

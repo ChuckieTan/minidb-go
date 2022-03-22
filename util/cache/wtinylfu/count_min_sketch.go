@@ -68,7 +68,7 @@ type CountMinSketch struct {
 
 func NewCountMinSketch(maxEntries int) *CountMinSketch {
 	ln2 := float64(math.Log(2))
-	tableSize := int(-float64(maxEntries) * math.Log(0.03) / (ln2 * ln2) * 0.8)
+	tableSize := int(-float64(maxEntries) * math.Log(0.01) / (ln2 * ln2) * 0.5)
 	return &CountMinSketch{
 		maxEntries:   maxEntries,
 		tableSize:    tableSize,
@@ -78,11 +78,11 @@ func NewCountMinSketch(maxEntries int) *CountMinSketch {
 	}
 }
 
-// 根据传入的元素计算出 4 个 hash 值
-func (c *CountMinSketch) getIndex(e Hashable) []uint64 {
+// 根据传入的元素计算出 4 个 hash 值，处于 [0, tableSize * 2)
+func (c *CountMinSketch) getHashs(e Hashable) []uint64 {
 	var index []uint64
 	for i := 0; i < 4; i++ {
-		index = append(index, e.Hash()*SEED[i]%uint64(c.tableSize))
+		index = append(index, e.Hash()*SEED[i]%(uint64(c.tableSize)*2))
 	}
 	return index
 }
@@ -93,9 +93,10 @@ func (c *CountMinSketch) Add(e Hashable) {
 	if c.count > c.maxFrequency {
 		c.reset()
 	}
-	indexs := c.getIndex(e)
-	for _, index := range indexs {
-		if index&1 == 1 {
+	hashs := c.getHashs(e)
+	for _, hash := range hashs {
+		index := hash >> 1
+		if hash&1 == 1 {
 			c.table[index].AddUpper()
 		} else {
 			c.table[index].AddLower()
@@ -116,11 +117,12 @@ func min[T Ordered](a, b T) T {
 
 // 获得次数数组中的最小值
 func (c *CountMinSketch) Count(e Hashable) int {
-	indexs := c.getIndex(e)
+	hashs := c.getHashs(e)
 	count := math.MaxInt
-	for _, index := range indexs {
+	for _, hash := range hashs {
+		index := hash >> 1
 		num := c.table[index]
-		if index&1 == 1 {
+		if hash&1 == 1 {
 			count = min(count, int(num.GetUpper()))
 		} else {
 			count = min(count, int(num.GetLower()))
