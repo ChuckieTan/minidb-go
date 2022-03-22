@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"math"
 	"minidb-go/util/cache"
+	"minidb-go/util/cache/wtinylfu"
 	"sync"
 	"testing"
 )
@@ -35,4 +36,24 @@ func TestSLRU(t *testing.T) {
 	ln2 := float64(math.Log(2))
 	tableSize := int(-float64(1000000)*math.Log(0.01)/(ln2*ln2)) / 2
 	t.Errorf("%v\n", tableSize)
+}
+
+type H int
+
+func (i H) Hash() uint64 {
+	return uint64(i)
+}
+
+func TestCountMinSketch(t *testing.T) {
+	c := wtinylfu.NewCountMinSketch(10000)
+	for i := H(0); i < 10000; i++ {
+		c.Add(i)
+	}
+	cnt := 0
+	for i := H(0); i < 10000; i++ {
+		if c.Count(i) != 1 {
+			cnt++
+		}
+	}
+	t.Error(cnt)
 }

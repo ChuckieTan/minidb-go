@@ -54,7 +54,7 @@ func NewWTinyLFU[K KeyType, V any](maxEntries int, onEvicted Eviction[K, V]) *WT
 	// probation 队列的最大元素数量占 20%
 	probationSize := (maxEntries - windowSize) * 2 / 10
 	// protection 队列的最大元素数量占 80%
-	protectionSize := (maxEntries - windowSize) * 8 / 10
+	protectionSize := maxEntries - windowSize - probationSize
 	return &WTinyLFU[K, V]{
 		onEvicted: onEvicted,
 

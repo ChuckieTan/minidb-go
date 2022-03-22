@@ -11,8 +11,45 @@ type Hashable interface {
 var SEED []uint64 = []uint64{
 	0xc3a5c85c97cb3127, 0xb492b66fbe98f273, 0x9ae16a3b2f90404f, 0xcbf29ce484222325}
 
-type DoubelBitNum struct {
-	A, B byte
+type Unit struct {
+	num uint8
+}
+
+const (
+	LowerMask = 0x0F
+	UpperMask = 0xF0
+)
+
+func (u *Unit) GetLower() uint8 {
+	return u.num & LowerMask
+}
+
+func (u *Unit) GetUpper() uint8 {
+	return u.num >> 4
+}
+
+// 设置低位，范围为 0-15
+func (u *Unit) SetLower(v uint8) {
+	u.num = (u.num & UpperMask) | (v & LowerMask)
+}
+
+// 设置高位，范围为 0-15
+func (u *Unit) SetUpper(v uint8) {
+	u.num = (u.num & LowerMask) | (v & UpperMask)
+}
+
+// 将低位加一，大于 16 将忽略
+func (u *Unit) AddLower() {
+	if u.GetLower() < 16 {
+		u.num++
+	}
+}
+
+// 将高位加一，大于 16 将忽略
+func (u *Unit) AddUpper() {
+	if u.GetUpper() < 16 {
+		u.num += 16
+	}
 }
 
 type CountMinSketch struct {
@@ -21,7 +58,7 @@ type CountMinSketch struct {
 	// 实际数组的最大值
 	tableSize int
 	// 数组
-	table []DoubelBitNum
+	table []Unit
 
 	// 进行加 1 的总数
 	count int
@@ -35,7 +72,7 @@ func NewCountMinSketch(maxEntries int) *CountMinSketch {
 	return &CountMinSketch{
 		maxEntries:   maxEntries,
 		tableSize:    tableSize,
-		table:        make([]DoubelBitNum, tableSize),
+		table:        make([]Unit, tableSize),
 		count:        0,
 		maxFrequency: maxEntries * 10,
 	}
@@ -59,19 +96,15 @@ func (c *CountMinSketch) Add(e Hashable) {
 	indexs := c.getIndex(e)
 	for _, index := range indexs {
 		if index&1 == 1 {
-			if c.table[index].A < 16 {
-				c.table[index].A++
-			}
+			c.table[index].AddUpper()
 		} else {
-			if c.table[index].B < 16 {
-				c.table[index].B++
-			}
+			c.table[index].AddLower()
 		}
 	}
 }
 
 type Ordered interface {
-	int | int16 | int32 | int64 | uint | uint16 | uint32 | uint64
+	int | int16 | int32 | int64 | uint | uint16 | uint32 | uint64 | string
 }
 
 func min[T Ordered](a, b T) T {
@@ -81,15 +114,16 @@ func min[T Ordered](a, b T) T {
 	return b
 }
 
-// 获得数组中的最小值
+// 获得次数数组中的最小值
 func (c *CountMinSketch) Count(e Hashable) int {
 	indexs := c.getIndex(e)
 	count := math.MaxInt
 	for _, index := range indexs {
+		num := c.table[index]
 		if index&1 == 1 {
-			count = min(count, int(c.table[index].A))
+			count = min(count, int(num.GetUpper()))
 		} else {
-			count = min(count, int(c.table[index].B))
+			count = min(count, int(num.GetLower()))
 		}
 	}
 	return count
@@ -98,11 +132,12 @@ func (c *CountMinSketch) Count(e Hashable) int {
 // 将所有元素减半
 func (c *CountMinSketch) reset() {
 	for i := 0; i < c.tableSize; i++ {
-		if i&1 == 1 {
-			c.table[i].A >>= 1
-		} else {
-			c.table[i].B >>= 1
-		}
+		lower := c.table[i].GetLower()
+		upper := c.table[i].GetUpper()
+		c.count -= int(lower - lower>>1)
+		c.count -= int(upper - upper>>1)
+		c.table[i].SetLower(lower >> 1)
+		c.table[i].SetUpper(upper >> 1)
 	}
 	c.count >>= 1
 }
